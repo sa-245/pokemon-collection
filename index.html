@@ -464,7 +464,7 @@
   .shelf-cards::-webkit-scrollbar { height: 6px; }
   .shelf-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   .shelf-card {
-    flex: 0 0 64px;
+    flex: 0 0 78px;
     cursor: pointer;
   }
   .shelf-card-img {
@@ -476,25 +476,26 @@
   }
   .shelf-card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .shelf-card-set {
-    font-size: 9px;
+    font-size: 11px;
     color: var(--text-2);
-    margin-top: 4px;
-    line-height: 1.2;
+    margin-top: 5px;
+    line-height: 1.25;
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .shelf-card-year {
-    font-size: 9px;
+    font-size: 10px;
     color: var(--text-3);
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.25;
+    margin-top: 1px;
   }
   @media (max-width: 540px) {
     .shelf-name { flex: 0 0 80px; }
     .shelf-name-title { font-size: 13px; }
-    .shelf-card { flex: 0 0 54px; }
+    .shelf-card { flex: 0 0 64px; }
   }
   .auth-screen {
     max-width: 400px;
