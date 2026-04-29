@@ -401,27 +401,23 @@
     background: var(--surface);
     border: 0.5px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 8px 16px;
+    padding: 4px 8px;
   }
-  .shelf-row {
+  .accordion-row {
+    border-bottom: 0.5px solid var(--border);
+  }
+  .accordion-row:last-child { border-bottom: none; }
+  .accordion-header {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 14px 0;
-    border-bottom: 0.5px solid var(--border);
-    transition: opacity 0.15s, background 0.15s;
+    padding: 10px 8px;
+    transition: background 0.12s;
   }
-  .shelf-row:last-child { border-bottom: none; }
-  .shelf-row.dragging {
-    opacity: 0.4;
+  .accordion-header.open {
+    background: var(--surface-2);
   }
-  .shelf-row.drop-above {
-    box-shadow: inset 0 2px 0 0 var(--text);
-  }
-  .shelf-row.drop-below {
-    box-shadow: inset 0 -2px 0 0 var(--text);
-  }
-  .shelf-handle {
+  .accordion-handle {
     flex: 0 0 18px;
     color: var(--text-3);
     font-size: 16px;
@@ -432,10 +428,118 @@
     text-align: center;
     touch-action: none;
   }
-  .shelf-handle:hover { color: var(--text-2); }
-  .shelf-handle:active { cursor: grabbing; }
+  .accordion-handle:hover { color: var(--text-2); }
+  .accordion-handle:active { cursor: grabbing; }
+  .accordion-cover {
+    flex: 0 0 44px;
+    width: 44px;
+    aspect-ratio: 245 / 342;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .accordion-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .accordion-name {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+  }
+  .accordion-name-title {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .accordion-name-meta {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: 2px;
+  }
+  .accordion-toggle {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+  }
+  .accordion-toggle:hover { background: var(--surface-2); color: var(--text); }
+  .accordion-toggle svg {
+    transition: transform 0.18s ease;
+  }
+  .accordion-toggle.open svg {
+    transform: rotate(180deg);
+  }
+  .accordion-content {
+    padding: 4px 8px 14px 50px;
+  }
+  .accordion-row.dragging {
+    opacity: 0.4;
+  }
+  .cover-toggle {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.55);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.12s, color 0.12s, transform 0.12s;
+  }
+  .cover-toggle:hover {
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    transform: scale(1.05);
+  }
+  .cover-toggle.active {
+    background: #fbbf24;
+    color: #422006;
+  }
+  .cover-toggle.active:hover {
+    background: #f59e0b;
+  }
+  .cover-toggle svg {
+    width: 16px;
+    height: 16px;
+  }
+  .accordion-row.drop-above {
+    box-shadow: inset 0 2px 0 0 var(--text);
+  }
+  .accordion-row.drop-below {
+    box-shadow: inset 0 -2px 0 0 var(--text);
+  }
+  .shelf-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .shelf-row:last-child { border-bottom: none; }
   .shelf-name {
-    flex: 0 0 100px;
+    flex: 0 0 140px;
     cursor: pointer;
     min-width: 0;
   }
@@ -717,6 +821,7 @@
   let lastSyncedJson = ""; // memo to avoid syncing identical state
   let initialLoadDone = false;
   let profileModalOpen = false; // when true, render the profile modal overlay
+  let expandedPokemon = new Set(); // names of pokémon whose row is expanded
 
   // ============ Persistence ============
   // Strategy: localStorage acts as a fast local cache + offline buffer.
@@ -1024,6 +1129,44 @@
 
   function cardsArr() {
     return Object.entries(collection.cards).map(([id, c]) => Object.assign({ id }, c));
+  }
+
+  // Find the cover card for a pokémon group:
+  // - If the user explicitly marked one with isCover: true, use that
+  // - Otherwise, fall back to the card with the highest rarity
+  function pickCoverCard(items) {
+    if (!items || items.length === 0) return null;
+    const explicit = items.find(c => c.isCover);
+    if (explicit) return explicit;
+    let best = items[0];
+    for (const c of items) {
+      if (rarityScore(c.rarity) > rarityScore(best.rarity)) best = c;
+    }
+    return best;
+  }
+
+  // Mark a card as the cover for its pokémon. Clears the flag from other
+  // cards of the same pokémon. Pass `null` to clear all (revert to default).
+  function setCoverCard(cardId) {
+    const target = collection.cards[cardId];
+    if (!target) return;
+    const pokemonName = target.pokemonName;
+    for (const id in collection.cards) {
+      if (collection.cards[id].pokemonName === pokemonName) {
+        delete collection.cards[id].isCover;
+      }
+    }
+    collection.cards[cardId].isCover = true;
+    saveCollection();
+  }
+
+  function clearCoverCard(pokemonName) {
+    for (const id in collection.cards) {
+      if (collection.cards[id].pokemonName === pokemonName) {
+        delete collection.cards[id].isCover;
+      }
+    }
+    saveCollection();
   }
 
   // Group cards by pokémon name, sort cards within each group by the chosen field,
@@ -1455,9 +1598,12 @@
     const groups = groupedPokemonInOrder(sortBy);
     const header =
       '<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap;">' +
-        '<div style="font-size: 12px; color: var(--text-2); flex: 1; min-width: 240px;">Reihen-Reihenfolge per Griff <span style="font-size: 14px;">⋮⋮</span> umsortieren.</div>' +
+        '<div style="font-size: 12px; color: var(--text-2); flex: 1; min-width: 240px;">' +
+          'Klick aufs Pokémon zum Auf-/Zuklappen. Reihenfolge per Griff <span style="font-size: 14px;">⋮⋮</span> umsortieren.' +
+        '</div>' +
         '<div style="display: flex; align-items: center; gap: 8px;">' +
-          '<label style="font-size: 12px; color: var(--text-2);">Karten sortieren:</label>' +
+          '<button class="btn-ghost" id="expand-all" style="font-size: 12px; padding: 5px 10px;">' + (allExpanded(groups) ? "Alle einklappen" : "Alle ausklappen") + '</button>' +
+          '<label style="font-size: 12px; color: var(--text-2);">Sortierung:</label>' +
           '<select id="shelf-sort" style="width: auto; min-width: 180px;">' +
             '<option value="year"' + (sortBy === "year" ? " selected" : "") + '>Nach Jahr</option>' +
             '<option value="set"' + (sortBy === "set" ? " selected" : "") + '>Nach Set (alphabetisch)</option>' +
@@ -1465,28 +1611,50 @@
           '</select>' +
         '</div>' +
       '</div>';
-    const rows = groups.map(g => {
+    const rows = groups.map(g => renderAccordionRow(g)).join("");
+    return header + '<div class="shelf-container">' + rows + '</div>';
+  }
+
+  function allExpanded(groups) {
+    if (!groups || groups.length === 0) return false;
+    return groups.every(g => expandedPokemon.has(g.name));
+  }
+
+  function renderAccordionRow(g) {
+    const cover = pickCoverCard(g.items);
+    const coverImg = (cover && cover.imageBase) ? imgUrl(cover.imageBase, "low", "webp") : "";
+    const cardWord = g.items.length === 1 ? "Karte" : "Karten";
+    const isOpen = expandedPokemon.has(g.name);
+
+    let content = "";
+    if (isOpen) {
       const cardsHtml = g.items.map(c => {
         const imgSrc = c.imageBase ? imgUrl(c.imageBase, "low", "webp") : "";
         const setLabel = c.setName || "—";
         const yr = yearOf(c.releaseDate);
-        return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
+        return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(c.pokemonName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
           '<div class="shelf-card-img">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(c.pokemonName) + '" loading="lazy">' : "") + '</div>' +
           '<div class="shelf-card-set">' + escHtml(setLabel) + '</div>' +
           (yr ? '<div class="shelf-card-year">' + escHtml(yr) + '</div>' : "") +
         '</div>';
       }).join("");
-      const cardWord = g.items.length === 1 ? "Karte" : "Karten";
-      return '<div class="shelf-row" data-pokemon="' + escHtml(g.name) + '">' +
-        '<div class="shelf-handle" data-handle="' + escHtml(g.name) + '" title="Ziehen zum Umsortieren">⋮⋮</div>' +
-        '<div class="shelf-name" data-open-pokemon="' + escHtml(g.name) + '">' +
-          '<div class="shelf-name-title">' + escHtml(g.name) + '</div>' +
-          '<div class="shelf-name-meta">' + g.items.length + ' ' + cardWord + '</div>' +
+      content = '<div class="accordion-content"><div class="shelf-cards">' + cardsHtml + '</div></div>';
+    }
+
+    return '<div class="accordion-row" data-pokemon="' + escHtml(g.name) + '">' +
+      '<div class="accordion-header ' + (isOpen ? "open" : "") + '">' +
+        '<div class="accordion-handle" data-handle="' + escHtml(g.name) + '" title="Ziehen zum Umsortieren">⋮⋮</div>' +
+        '<div class="accordion-cover" data-open-pokemon="' + escHtml(g.name) + '" title="Detail-Ansicht">' +
+          (coverImg ? '<img src="' + escHtml(coverImg) + '" alt="' + escHtml(g.name) + '" loading="lazy">' : "") +
         '</div>' +
-        '<div class="shelf-cards">' + cardsHtml + '</div>' +
-      '</div>';
-    }).join("");
-    return header + '<div class="shelf-container">' + rows + '</div>';
+        '<div class="accordion-name" data-toggle-pokemon="' + escHtml(g.name) + '">' +
+          '<div class="accordion-name-title">' + escHtml(g.name) + '</div>' +
+          '<div class="accordion-name-meta">' + g.items.length + ' ' + cardWord + '</div>' +
+        '</div>' +
+        '<button class="accordion-toggle ' + (isOpen ? "open" : "") + '" data-toggle-pokemon="' + escHtml(g.name) + '" aria-label="' + (isOpen ? "Einklappen" : "Ausklappen") + '">' + chevronIcon() + '</button>' +
+      '</div>' +
+      content +
+    '</div>';
   }
 
   function renderPokemonDetail(cards) {
@@ -1612,8 +1780,12 @@
     const imgSrc = card.imageBase ? imgUrl(card.imageBase, "high", "webp") : "";
     const langLabel = card.language ? (LANG_BY_CODE[card.language] ? LANG_BY_CODE[card.language].short : card.language) : "";
     const variantLabel = card.variant && VARIANT_BY_CODE[card.variant] ? VARIANT_BY_CODE[card.variant].short : "";
+    const isCover = !!card.isCover;
     return '<div class="card" data-card-id="' + escHtml(card.id) + '">' +
-      '<div class="card-img card-img-wrap">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(card.pokemonName) + '" loading="lazy">' : "") + '</div>' +
+      '<div class="card-img card-img-wrap" style="position: relative;">' +
+        (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(card.pokemonName) + '" loading="lazy">' : "") +
+        '<button class="cover-toggle ' + (isCover ? "active" : "") + '" data-cover="' + escHtml(card.id) + '" title="' + (isCover ? "Aktuelles Titelbild — klicken zum Aufheben" : "Als Titelbild setzen") + '">' + starIcon(isCover) + '</button>' +
+      '</div>' +
       '<div class="card-body">' +
         '<div class="card-title">' + escHtml(card.pokemonName) + '</div>' +
         '<div class="card-meta">' + escHtml(card.setName || "") + ' · ' + escHtml(card.cardNumber || "") + '</div>' +
@@ -1939,40 +2111,63 @@
       });
     });
 
-    // Shelf: open detail by clicking the Pokémon name
-    document.querySelectorAll("[data-open-pokemon]").forEach(el => {
-      el.addEventListener("click", () => {
-        view = { name: "pokemon", pokemonName: el.dataset.openPokemon };
-        render();
-      });
-    });
-
     // Shelf: sort selector
     on("#shelf-sort", "change", e => {
       view.shelfSortBy = e.target.value;
       render();
     });
 
-    // Shelf: open detail by clicking a card thumbnail.
-    // In Pokémon-Regal: jumps to the pokémon's detail view.
-    // In Künstler-Regal: jumps to the pokémon detail of *that specific card*
-    // (the row itself is keyed by artist, but each card has data-card-pokemon).
+    // Shelf-card click — works in both accordion (Pokémon view) and shelf-row (artist view) contexts
     document.querySelectorAll(".shelf-card").forEach(el => {
-      el.addEventListener("click", () => {
-        const row = el.closest(".shelf-row");
-        if (!row) return;
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const accordionRow = el.closest(".accordion-row");
+        const shelfRow = el.closest(".shelf-row");
         if (el.dataset.cardPokemon) {
           // Künstler-Reihe — Pokémon-Name steckt am Card-Element selbst
           view = { name: "pokemon", pokemonName: el.dataset.cardPokemon };
-        } else if (row.dataset.pokemon) {
-          // Pokémon-Reihe — Pokémon-Name steckt an der Reihe
-          view = { name: "pokemon", pokemonName: row.dataset.pokemon };
+        } else if (accordionRow && accordionRow.dataset.pokemon) {
+          // Pokémon-Akkordeon — Pokémon-Name an der accordion-row
+          view = { name: "pokemon", pokemonName: accordionRow.dataset.pokemon };
+        } else if (shelfRow && shelfRow.dataset.pokemon) {
+          view = { name: "pokemon", pokemonName: shelfRow.dataset.pokemon };
         }
         render();
       });
     });
 
-    // Shelf: drag handles for reordering (only on the Pokémon-Regal)
+    // Akkordeon: Toggle ein-/ausklappen (Klick auf Name oder Pfeil-Button)
+    document.querySelectorAll("[data-toggle-pokemon]").forEach(el => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const name = el.dataset.togglePokemon;
+        if (expandedPokemon.has(name)) expandedPokemon.delete(name);
+        else expandedPokemon.add(name);
+        render();
+      });
+    });
+
+    // Akkordeon: Klick aufs Titelbild öffnet Detail-Ansicht
+    document.querySelectorAll("[data-open-pokemon]").forEach(el => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        view = { name: "pokemon", pokemonName: el.dataset.openPokemon };
+        render();
+      });
+    });
+
+    // "Alle aus-/einklappen"-Button
+    on("#expand-all", "click", () => {
+      const groups = groupedPokemonInOrder(view.shelfSortBy || "year");
+      if (allExpanded(groups)) {
+        expandedPokemon.clear();
+      } else {
+        expandedPokemon = new Set(groups.map(g => g.name));
+      }
+      render();
+    });
+
+    // Drag handles for reordering (only on the Pokémon accordion)
     attachDragHandlers();
 
     // Künstler-Regal: Klick auf Künstler-Namen öffnet Detail-Ansicht
@@ -2058,7 +2253,7 @@
   // unified mouse + touch handling. The handle (⋮⋮) initiates the drag;
   // the whole row gets the visual drag state.
   function attachDragHandlers() {
-    const handles = document.querySelectorAll(".shelf-handle[data-handle]");
+    const handles = document.querySelectorAll(".accordion-handle[data-handle]");
     handles.forEach(handle => {
       handle.addEventListener("pointerdown", onDragStart);
     });
@@ -2067,10 +2262,10 @@
   function onDragStart(e) {
     e.preventDefault();
     const handle = e.currentTarget;
-    const row = handle.closest(".shelf-row");
+    const row = handle.closest(".accordion-row");
     if (!row) return;
     const name = handle.dataset.handle;
-    const allRows = Array.from(document.querySelectorAll(".shelf-row"));
+    const allRows = Array.from(document.querySelectorAll(".accordion-row"));
     const fromIndex = allRows.indexOf(row);
     if (fromIndex === -1) return;
 
@@ -2125,7 +2320,7 @@
 
   function onDragEnd(e, row) {
     if (!dragState) return;
-    const allRows = Array.from(document.querySelectorAll(".shelf-row"));
+    const allRows = Array.from(document.querySelectorAll(".accordion-row"));
     allRows.forEach(r => r.classList.remove("drop-above", "drop-below", "dragging"));
 
     if (dragState.currentDropIndex !== dragState.fromIndex) {
@@ -2164,6 +2359,21 @@
     document.querySelectorAll("[data-delete]").forEach(el => {
       el.addEventListener("click", () => removeCard(el.dataset.delete));
     });
+    document.querySelectorAll("[data-cover]").forEach(el => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = el.dataset.cover;
+        const card = collection.cards[id];
+        if (!card) return;
+        if (card.isCover) {
+          // Currently the cover — clicking again removes the manual choice
+          clearCoverCard(card.pokemonName);
+        } else {
+          setCoverCard(id);
+        }
+        render();
+      });
+    });
   }
 
   function on(sel, evt, fn) {
@@ -2187,6 +2397,10 @@
   function xIcon()       { return svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'); }
   function trashIcon()   { return svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'); }
   function chevronIcon() { return svg('<polyline points="6 9 12 15 18 9"/>'); }
+  function starIcon(filled) {
+    const fill = filled ? "currentColor" : "none";
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="' + fill + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+  }
   function svg(inner) {
     return '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
   }
