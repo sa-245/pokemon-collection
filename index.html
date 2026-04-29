@@ -205,6 +205,32 @@
   .card-title { font-size: 13px; font-weight: 500; line-height: 1.3; }
   .card-meta { font-size: 11px; color: var(--text-2); margin-top: 3px; line-height: 1.4; }
   .card-artist { font-size: 11px; color: var(--text-2); margin-top: 2px; font-style: italic; }
+  .card-price {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .card-price-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .card-price-total {
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .card-price-link {
+    font-size: 11px;
+    color: var(--info-fg);
+    text-decoration: none;
+    margin-left: auto;
+  }
+  .card-price-link:hover { text-decoration: underline; }
   .pills { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
   .pill {
     font-size: 10px;
@@ -741,6 +767,14 @@
     line-height: 1.25;
     margin-top: 1px;
   }
+  .shelf-card-price {
+    font-size: 10px;
+    color: var(--text);
+    text-align: center;
+    line-height: 1.25;
+    margin-top: 2px;
+    font-weight: 500;
+  }
   @media (max-width: 540px) {
     .shelf-name { flex: 0 0 80px; }
     .shelf-name-title { font-size: 13px; }
@@ -967,6 +1001,8 @@
   let initialLoadDone = false;
   let profileModalOpen = false; // when true, render the profile modal overlay
   let expandedPokemon = new Set(); // names of pokémon whose row is expanded
+  let priceRefreshing = false; // true while a refresh run is in progress
+  let priceRefreshProgress = { done: 0, total: 0 };
 
   // ============ Persistence ============
   // Strategy: localStorage acts as a fast local cache + offline buffer.
@@ -1254,6 +1290,8 @@
     render();
     // Backfill missing release dates in the background (won't block UI)
     backfillReleaseDates();
+    // Auto-refresh prices once a day (won't block UI either)
+    refreshPrices({ auto: true });
   }
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
@@ -1402,6 +1440,64 @@
     return m ? m[1] : "";
   }
 
+  // ============ Pricing ============
+  // Extract per-variant 7-day average from a TCGdex pricing payload.
+  // Cardmarket only differentiates "normal" vs "holo" — we map our 5 variants down:
+  //   normal       -> avg (normal)
+  //   reverse      -> avg (normal — Cardmarket bundles reverse with normal)
+  //   holo         -> avg-holo
+  //   firstEdition -> avg-holo (best-effort; no separate field)
+  //   wPromo       -> avg (normal)
+  function extractPriceForVariant(pricing, variant) {
+    if (!pricing || !pricing.cardmarket) return null;
+    const cm = pricing.cardmarket;
+    const useHolo = (variant === "holo" || variant === "firstEdition");
+    const value = useHolo ? cm["avg7-holo"] : cm["avg7"];
+    if (typeof value !== "number" || isNaN(value)) return null;
+    return value;
+  }
+
+  // Format a EUR amount for display. Uses German locale.
+  function formatPrice(value) {
+    if (value == null || isNaN(value)) return "";
+    if (value < 0.01) return "< 0,01 €";
+    return value.toLocaleString("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // Total value of a single card entry, accounting for quantity.
+  function cardTotalValue(c) {
+    if (typeof c.price !== "number" || isNaN(c.price)) return 0;
+    const qty = Number(c.quantity) || 1;
+    return c.price * qty;
+  }
+
+  // Sum of an array of cards' total values.
+  function sumValue(cards) {
+    let total = 0;
+    for (const c of cards) total += cardTotalValue(c);
+    return total;
+  }
+
+  // Format a "letzte Aktualisierung" relative time
+  function formatRelativeTime(timestamp) {
+    if (!timestamp) return "noch nie aktualisiert";
+    const diffMs = Date.now() - timestamp;
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return "gerade eben";
+    if (minutes < 60) return "vor " + minutes + " Min.";
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return "vor " + hours + " Std.";
+    const days = Math.floor(hours / 24);
+    return "vor " + days + " Tag" + (days === 1 ? "" : "en");
+  }
+
+  // Build a Cardmarket URL for a given card ID (best-effort — we use the
+  // English set ID and card number, as Cardmarket URLs aren't language-specific).
+  function cardmarketUrl(card) {
+    if (!card.setId || !card.cardNumber) return null;
+    return "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=" + encodeURIComponent(card.pokemonName + " " + card.cardNumber);
+  }
+
   // ============ Set info cache ============
   // TCGdex's card endpoint returns a partial `set` object without `releaseDate`.
   // To show the year on cards, we need to fetch the full set separately.
@@ -1455,6 +1551,84 @@
     if (changed) {
       saveCollection();
       render();
+    }
+  }
+
+  // ============ Price refresh ============
+  // Refresh prices for all cards in the collection.
+  // - automatic: only runs if last refresh was > 20h ago and not already running
+  // - manual: triggered from the profile modal
+  // Uses a per-card-id cache within the session to avoid redundant fetches
+  // when many copies of the same card exist (different variants/quantities).
+  async function refreshPrices(opts) {
+    opts = opts || {};
+    if (priceRefreshing) return;
+    const ids = Object.keys(collection.cards);
+    if (ids.length === 0) return;
+
+    if (opts.auto) {
+      const last = collection.pricesUpdatedAt || 0;
+      const twentyHours = 20 * 60 * 60 * 1000;
+      if (Date.now() - last < twentyHours) return;
+    }
+
+    priceRefreshing = true;
+    priceRefreshProgress = { done: 0, total: ids.length };
+    renderPriceIndicator();
+    if (profileModalOpen) render();
+
+    // Group by language+cardId so we only fetch each unique card once
+    const cache = {};
+    for (const id of ids) {
+      const c = collection.cards[id];
+      if (!c.cardId || !c.language) {
+        priceRefreshProgress.done++;
+        continue;
+      }
+      const key = c.language + ":" + c.cardId;
+      if (cache[key] === undefined) {
+        try {
+          const url = API_BASE + "/" + encodeURIComponent(c.language) + "/cards/" + encodeURIComponent(c.cardId);
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            cache[key] = data.pricing || null;
+          } else {
+            cache[key] = null;
+          }
+        } catch (e) {
+          cache[key] = null;
+        }
+      }
+      const pricing = cache[key];
+      const newPrice = extractPriceForVariant(pricing, c.variant || "normal");
+      if (typeof newPrice === "number") {
+        c.price = newPrice;
+        c.priceUpdatedAt = Date.now();
+      }
+      priceRefreshProgress.done++;
+      // Update UI every few cards so the user sees progress
+      if (priceRefreshProgress.done % 5 === 0) {
+        renderPriceIndicator();
+        if (profileModalOpen) render();
+      }
+    }
+
+    collection.pricesUpdatedAt = Date.now();
+    priceRefreshing = false;
+    priceRefreshProgress = { done: 0, total: 0 };
+    saveCollection();
+    render();
+  }
+
+  // Lightweight indicator update (avoids full re-render during refresh)
+  function renderPriceIndicator() {
+    const el = document.getElementById("price-indicator");
+    if (!el) return;
+    if (priceRefreshing) {
+      el.textContent = "Aktualisiere Preise … " + priceRefreshProgress.done + "/" + priceRefreshProgress.total;
+    } else {
+      el.textContent = "";
     }
   }
 
@@ -1552,11 +1726,18 @@
     const avatarSrc = (collection.profile && collection.profile.avatar) ? collection.profile.avatar : "";
     const avatarInitial = avatarInitialFor(user.email, collection.profile ? collection.profile.name : "");
 
+    const totalValue = sumValue(cards);
+    const totalValueLabel = totalValue > 0 ? formatPrice(totalValue) : "";
+
     app.innerHTML =
       '<div class="header">' +
         '<div>' +
           '<h1>' + escHtml(collectionTitle) + ' <span class="sync-indicator ' + syncStatus + '" id="sync-indicator"><span class="dot"></span><span>' + syncLabel() + '</span></span></h1>' +
-          '<div class="header-meta">' + totalCount + ' Karten · ' + uniquePokemon + ' verschiedene Pokémon</div>' +
+          '<div class="header-meta">' +
+            totalCount + ' Karten · ' + uniquePokemon + ' verschiedene Pokémon' +
+            (totalValueLabel ? ' · <span style="font-weight: 500; color: var(--text);">Wert: ' + escHtml(totalValueLabel) + '</span>' : "") +
+            ' <span id="price-indicator" style="margin-left: 8px; color: var(--text-3); font-size: 11px;">' + (priceRefreshing ? "Aktualisiere Preise … " + priceRefreshProgress.done + "/" + priceRefreshProgress.total : "") + '</span>' +
+          '</div>' +
         '</div>' +
         '<div class="header-actions">' +
           '<button class="btn-primary" id="btn-add">' + plusIcon() + ' Karte hinzufügen</button>' +
@@ -1613,6 +1794,11 @@
     const profile = collection.profile || { name: "", avatar: "" };
     const avatarSrc = profile.avatar || "";
     const initial = avatarInitialFor(user.email, profile.name);
+    const lastUpdate = collection.pricesUpdatedAt ? formatRelativeTime(collection.pricesUpdatedAt) : "noch nie aktualisiert";
+    const refreshing = priceRefreshing;
+    const refreshLabel = refreshing
+      ? ('Aktualisiere ' + priceRefreshProgress.done + '/' + priceRefreshProgress.total + ' …')
+      : 'Preise jetzt aktualisieren';
     return '<div class="modal-overlay" id="profile-overlay">' +
       '<div class="modal" id="profile-modal" style="max-width: 460px;">' +
         '<div class="modal-header">' +
@@ -1634,6 +1820,11 @@
             '<label class="field-label">Name der Sammlung</label>' +
             '<input type="text" id="profile-name" value="' + escHtml(profile.name) + '" placeholder="z.B. „Sarahs Pokémon-Sammlung"" maxlength="80">' +
             '<div style="font-size: 11px; color: var(--text-2); margin-top: 4px;">Wird statt „Meine Sammlung" oben angezeigt.</div>' +
+          '</div>' +
+          '<div style="padding-top: 12px; border-top: 0.5px solid var(--border);">' +
+            '<label class="field-label">Marktpreise (Cardmarket)</label>' +
+            '<div style="font-size: 11px; color: var(--text-2); margin-bottom: 8px;">7-Tages-Durchschnitt, automatisch ein Mal täglich aktualisiert. Letzte Aktualisierung: ' + escHtml(lastUpdate) + '</div>' +
+            '<button class="btn-ghost" id="profile-refresh-prices"' + (refreshing ? " disabled" : "") + ' style="width: 100%; justify-content: center;">' + escHtml(refreshLabel) + '</button>' +
           '</div>' +
           '<div style="font-size: 12px; color: var(--text-2); padding-top: 8px; border-top: 0.5px solid var(--border);">' +
             'Angemeldet als <b>' + escHtml(user.email) + '</b>' +
@@ -1681,6 +1872,9 @@
         closeProfileModal();
         signOut();
       }
+    });
+    on("#profile-refresh-prices", "click", () => {
+      refreshPrices({ auto: false });
     });
   }
 
@@ -1770,13 +1964,15 @@
     const coverImg = (cover && cover.imageBase) ? imgUrl(cover.imageBase, "low", "webp") : "";
     const cardWord = g.items.length === 1 ? "Karte" : "Karten";
     const isOpen = expandedPokemon.has(g.name);
+    const groupValue = sumValue(g.items);
+    const groupValueLabel = groupValue > 0 ? formatPrice(groupValue) : "";
 
     if (!isOpen) {
       return '<div class="pokemon-tile" data-pokemon="' + escHtml(g.name) + '" data-toggle-pokemon="' + escHtml(g.name) + '">' +
         '<div class="tile-handle" data-handle="' + escHtml(g.name) + '" title="Ziehen zum Umsortieren">⋮⋮</div>' +
         '<div class="tile-cover">' + (coverImg ? '<img src="' + escHtml(coverImg) + '" alt="' + escHtml(g.name) + '" loading="lazy">' : "") + '</div>' +
         '<div class="tile-name">' + escHtml(g.name) + '</div>' +
-        '<div class="tile-meta">' + g.items.length + ' ' + cardWord + '</div>' +
+        '<div class="tile-meta">' + g.items.length + ' ' + cardWord + (groupValueLabel ? ' · ' + escHtml(groupValueLabel) : "") + '</div>' +
       '</div>';
     }
 
@@ -1784,10 +1980,12 @@
       const imgSrc = c.imageBase ? imgUrl(c.imageBase, "low", "webp") : "";
       const setLabel = c.setName || "—";
       const yr = yearOf(c.releaseDate);
-      return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(c.pokemonName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
+      const priceLabel = (typeof c.price === "number") ? formatPrice(c.price) : "";
+      return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(c.pokemonName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "") + (priceLabel ? " · " + priceLabel : "")) + '">' +
         '<div class="shelf-card-img">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(c.pokemonName) + '" loading="lazy">' : "") + '</div>' +
         '<div class="shelf-card-set">' + escHtml(setLabel) + '</div>' +
         (yr ? '<div class="shelf-card-year">' + escHtml(yr) + '</div>' : "") +
+        (priceLabel ? '<div class="shelf-card-price">' + escHtml(priceLabel) + '</div>' : "") +
       '</div>';
     }).join("");
 
@@ -1799,7 +1997,7 @@
         '</div>' +
         '<div class="expanded-name" data-toggle-pokemon="' + escHtml(g.name) + '">' +
           '<div class="expanded-name-title">' + escHtml(g.name) + '</div>' +
-          '<div class="expanded-name-meta">' + g.items.length + ' ' + cardWord + '</div>' +
+          '<div class="expanded-name-meta">' + g.items.length + ' ' + cardWord + (groupValueLabel ? ' · ' + escHtml(groupValueLabel) : "") + '</div>' +
         '</div>' +
         '<button class="expanded-toggle" data-toggle-pokemon="' + escHtml(g.name) + '" aria-label="Einklappen">' + chevronIcon() + '</button>' +
       '</div>' +
@@ -1931,6 +2129,9 @@
     const langLabel = card.language ? (LANG_BY_CODE[card.language] ? LANG_BY_CODE[card.language].short : card.language) : "";
     const variantLabel = card.variant && VARIANT_BY_CODE[card.variant] ? VARIANT_BY_CODE[card.variant].short : "";
     const isCover = !!card.isCover;
+    const priceLabel = (typeof card.price === "number") ? formatPrice(card.price) : "";
+    const cmUrl = priceLabel ? cardmarketUrl(card) : null;
+    const totalLabel = (typeof card.price === "number" && (Number(card.quantity) || 1) > 1) ? formatPrice(cardTotalValue(card)) : "";
     return '<div class="card" data-card-id="' + escHtml(card.id) + '">' +
       '<div class="card-img card-img-wrap" style="position: relative;">' +
         (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(card.pokemonName) + '" loading="lazy">' : "") +
@@ -1940,6 +2141,13 @@
         '<div class="card-title">' + escHtml(card.pokemonName) + '</div>' +
         '<div class="card-meta">' + escHtml(card.setName || "") + ' · ' + escHtml(card.cardNumber || "") + '</div>' +
         (card.artist ? '<div class="card-artist">Illus. ' + escHtml(card.artist) + '</div>' : "") +
+        (priceLabel ?
+          '<div class="card-price">' +
+            '<span class="card-price-value">' + escHtml(priceLabel) + '</span>' +
+            (totalLabel ? '<span class="card-price-total">Gesamt: ' + escHtml(totalLabel) + '</span>' : "") +
+            (cmUrl ? '<a href="' + escHtml(cmUrl) + '" target="_blank" rel="noopener noreferrer" class="card-price-link" title="Auf Cardmarket suchen">Cardmarket ↗</a>' : "") +
+          '</div>'
+        : "") +
         '<div class="pills">' +
           (card.rarity ? '<span class="pill">' + escHtml(card.rarity) + '</span>' : "") +
           (variantLabel ? '<span class="pill pill-info">' + escHtml(variantLabel) + '</span>' : "") +
@@ -2184,6 +2392,7 @@
         releaseDate: releaseDate,
         imageBase: card.image || stub.image || "",
         availableVariants: card.variants || null,
+        pricing: card.pricing || null,
       };
       // Default to "normal" — user actively picks the variant they have
       modalState.meta.variant = "normal";
@@ -2207,6 +2416,8 @@
     readModalMeta();
     const sel = modalState.selected;
     if (!sel) return;
+    const variant = modalState.meta.variant || "normal";
+    const price = extractPriceForVariant(sel.pricing, variant);
     const entry = {
       cardId: sel.cardId,
       pokemonName: sel.name,
@@ -2218,9 +2429,11 @@
       releaseDate: sel.releaseDate,
       imageBase: sel.imageBase,
       language: modalState.lang,
-      variant: modalState.meta.variant || "normal",
+      variant: variant,
       quantity: Number(modalState.meta.quantity) || 1,
       notes: modalState.meta.notes,
+      price: (typeof price === "number") ? price : null,
+      priceUpdatedAt: (typeof price === "number") ? Date.now() : null,
     };
     addCard(entry);
     // Reset for adding another card
