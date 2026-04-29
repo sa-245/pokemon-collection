@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meine Pokémon-Sammlung</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --surface: #ffffff;
+    --surface-2: #f1efe8;
+    --text: #1f1f1d;
+    --text-2: #6b6a64;
+    --text-3: #999893;
+    --border: rgba(0, 0, 0, 0.12);
+    --border-strong: rgba(0, 0, 0, 0.25);
+    --accent: #1f1f1d;
+    --info-bg: #e6f1fb;
+    --info-fg: #0c447c;
+    --warn-bg: #faeeda;
+    --warn-fg: #854f0b;
+    --danger-bg: #fcebeb;
+    --danger-fg: #a32d2d;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #252523;
+      --surface-2: #2f2f2c;
+      --text: #f1efe8;
+      --text-2: #a8a7a1;
+      --text-3: #6b6a64;
+      --border: rgba(255, 255, 255, 0.12);
+      --border-strong: rgba(255, 255, 255, 0.25);
+      --accent: #f1efe8;
+      --info-bg: #0c447c;
+      --info-fg: #b5d4f4;
+      --warn-bg: #633806;
+      --warn-fg: #fac775;
+      --danger-bg: #501313;
+      --danger-fg: #f7c1c1;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 4rem;
+  }
+  h1 { font-size: 22px; font-weight: 500; margin: 0; }
+  h2 { font-size: 18px; font-weight: 500; margin: 0; }
+  h3 { font-size: 16px; font-weight: 500; margin: 0; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  input, select, textarea {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 10px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text);
+    width: 100%;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--border-strong);
+    box-shadow: 0 0 0 2px rgba(127,127,127,0.1);
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 7px 14px;
+    font-weight: 500;
+  }
+  .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    color: var(--text);
+    border: 0.5px solid var(--border);
+    padding: 7px 12px;
+  }
+  .btn-ghost:hover { border-color: var(--border-strong); }
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--text);
+    border: 0.5px solid var(--border);
+    padding: 7px;
+    width: 32px;
+    height: 32px;
+  }
+  .btn-icon:hover { border-color: var(--border-strong); }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-meta {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: 4px;
+  }
+  .header-actions { display: flex; gap: 8px; }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+  }
+  .tab {
+    background: transparent;
+    border: none;
+    padding: 9px 14px;
+    font-size: 13px;
+    color: var(--text-2);
+    border-bottom: 1.5px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tab.active {
+    color: var(--text);
+    border-bottom-color: var(--text);
+    font-weight: 500;
+  }
+  .grid-pokedex {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .grid-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+  }
+  .grid-artists {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .pokedex-tile, .artist-tile {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 8px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pokedex-tile:hover, .artist-tile:hover { border-color: var(--border-strong); }
+  .artist-tile { padding: 12px 14px; }
+  .card-img-wrap {
+    aspect-ratio: 245 / 342;
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .card-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile-title { font-size: 14px; font-weight: 500; line-height: 1.2; }
+  .tile-meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .card-img { aspect-ratio: 245 / 342; background: var(--surface-2); }
+  .card-body { padding: 10px 12px; }
+  .card-title { font-size: 13px; font-weight: 500; line-height: 1.3; }
+  .card-meta { font-size: 11px; color: var(--text-2); margin-top: 3px; line-height: 1.4; }
+  .card-artist { font-size: 11px; color: var(--text-2); margin-top: 2px; font-style: italic; }
+  .pills { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .pill {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    line-height: 1.4;
+    background: var(--surface-2);
+    color: var(--text-2);
+  }
+  .pill-info { background: var(--info-bg); color: var(--info-fg); }
+  .pill-warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .card-toggle {
+    width: 100%;
+    margin-top: 10px;
+    background: transparent;
+    border: 0.5px solid var(--border);
+    color: var(--text);
+    font-size: 12px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .card-edit {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .card-edit.open { display: flex; }
+  .field-label {
+    font-size: 11px;
+    color: var(--text-2);
+    display: block;
+    margin-bottom: 3px;
+  }
+  .empty {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: var(--text-2);
+  }
+  .empty-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .empty-body {
+    font-size: 13px;
+    max-width: 460px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  .detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .detail-title {
+    flex: 1;
+    text-align: center;
+  }
+  .detail-sort { width: auto; min-width: 160px; }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+    z-index: 100;
+    overflow-y: auto;
+  }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 720px;
+    border: 0.5px solid var(--border);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .modal-help {
+    font-size: 12px;
+    color: var(--text-2);
+    margin: 0 0 12px;
+  }
+  .lang-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .lang-btn {
+    background: transparent;
+    border: 0.5px solid var(--border);
+    color: var(--text-2);
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .lang-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+  .search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .search-row input { flex: 1; }
+  .error-box {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+    padding: 4px;
+  }
+  .result-tile {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .result-tile:hover { border-color: var(--border-strong); }
+  .result-name { font-size: 11px; font-weight: 500; margin-top: 4px; line-height: 1.2; }
+  .result-set { font-size: 10px; color: var(--text-2); line-height: 1.3; }
+  .result-num { font-size: 10px; color: var(--text-3); }
+  .selected-grid {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 16px;
+  }
+  .selected-grid img { width: 100%; border-radius: var(--radius-md); display: block; }
+  .selected-name { font-size: 15px; font-weight: 500; }
+  .selected-meta { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+  .form-stack { display: flex; flex-direction: column; gap: 8px; }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .icon { width: 14px; height: 14px; flex-shrink: 0; }
+  .center-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    color: var(--text-2);
+  }
+  .results-count {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-bottom: 12px;
+  }
+  .danger-text { color: var(--danger-fg); }
+  @media (max-width: 540px) {
+    .selected-grid { grid-template-columns: 1fr; }
+    .grid-pokedex { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    .grid-cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  }
+  .hidden { display: none !important; }
+  .shelf-container {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 8px 16px;
+  }
+  .shelf-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 0.5px solid var(--border);
+    transition: opacity 0.15s, background 0.15s;
+  }
+  .shelf-row:last-child { border-bottom: none; }
+  .shelf-row.dragging {
+    opacity: 0.4;
+  }
+  .shelf-row.drop-above {
+    box-shadow: inset 0 2px 0 0 var(--text);
+  }
+  .shelf-row.drop-below {
+    box-shadow: inset 0 -2px 0 0 var(--text);
+  }
+  .shelf-handle {
+    flex: 0 0 18px;
+    color: var(--text-3);
+    font-size: 16px;
+    cursor: grab;
+    line-height: 1;
+    user-select: none;
+    padding: 4px 0;
+    text-align: center;
+    touch-action: none;
+  }
+  .shelf-handle:hover { color: var(--text-2); }
+  .shelf-handle:active { cursor: grabbing; }
+  .shelf-name {
+    flex: 0 0 100px;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .shelf-name-title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .shelf-name-meta {
+    font-size: 11px;
+    color: var(--text-2);
+    margin-top: 2px;
+  }
+  .shelf-cards {
+    flex: 1;
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  .shelf-cards::-webkit-scrollbar { height: 6px; }
+  .shelf-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .shelf-card {
+    flex: 0 0 64px;
+    cursor: pointer;
+  }
+  .shelf-card-img {
+    aspect-ratio: 245 / 342;
+    background: var(--surface-2);
+    border-radius: 4px;
+    border: 0.5px solid var(--border);
+    overflow: hidden;
+  }
+  .shelf-card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .shelf-card-set {
+    font-size: 9px;
+    color: var(--text-2);
+    margin-top: 4px;
+    line-height: 1.2;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .shelf-card-year {
+    font-size: 9px;
+    color: var(--text-3);
+    text-align: center;
+    line-height: 1.2;
+  }
+  @media (max-width: 540px) {
+    .shelf-name { flex: 0 0 80px; }
+    .shelf-name-title { font-size: 13px; }
+    .shelf-card { flex: 0 0 54px; }
+  }
+  .auth-screen {
+    max-width: 400px;
+    margin: 4rem auto 2rem;
+    padding: 2rem 1.5rem;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+  .auth-screen h1 {
+    margin: 0 0 4px;
+    text-align: center;
+  }
+  .auth-screen .auth-subtitle {
+    font-size: 13px;
+    color: var(--text-2);
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  .auth-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 1.25rem;
+  }
+  .auth-tabs .tab {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+  .auth-form { display: flex; flex-direction: column; gap: 12px; }
+  .auth-form label {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-bottom: 4px;
+    display: block;
+  }
+  .auth-status {
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .auth-status.error { background: var(--danger-bg); color: var(--danger-fg); }
+  .auth-status.info { background: var(--info-bg); color: var(--info-fg); }
+  .sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-2);
+    margin-left: 8px;
+  }
+  .sync-indicator .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-3);
+  }
+  .sync-indicator.synced .dot { background: #22c55e; }
+  .sync-indicator.syncing .dot { background: #eab308; animation: pulse 1.2s infinite; }
+  .sync-indicator.error .dot { background: #ef4444; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-2);
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    border: 0.5px solid var(--border);
+    background: transparent;
+    cursor: pointer;
+  }
+  .user-chip:hover { border-color: var(--border-strong); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="center-loader"><div class="spinner"></div></div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  // ============ Constants ============
+  const STORAGE_KEY = "poke-collection-v2";
+  const API_BASE = "https://api.tcgdex.net/v2";
+
+  // Supabase config (Phase 1 setup)
+  const SUPABASE_URL = "https://duombrqnwbqrhwurgkow.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1b21icnFud2Jxcmh3dXJna293Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NjQyMDcsImV4cCI6MjA5MzA0MDIwN30.qIDYdJA416aGVG6F0-V7n53t7S3EpU2OrsLqVcS8Q40";
+  const supa = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  // Available languages: pokemon-tcg cards officially exist in these
+  const LANGS = [
+    { code: "en", label: "Englisch", short: "EN" },
+    { code: "de", label: "Deutsch", short: "DE" },
+    { code: "ja", label: "Japanisch", short: "JP" },
+    { code: "id", label: "Indonesisch", short: "ID" },
+  ];
+  const LANG_BY_CODE = LANGS.reduce((m, l) => (m[l.code] = l, m), {});
+
+  // Card variants from TCGdex's variants object (which printings exist for a card)
+  const VARIANTS = [
+    { code: "normal",       label: "Normal",       short: "Normal" },
+    { code: "holo",         label: "Holo",         short: "Holo" },
+    { code: "reverse",      label: "Reverse Holo", short: "Reverse" },
+    { code: "firstEdition", label: "1st Edition",  short: "1st Ed." },
+    { code: "wPromo",       label: "Promo-Stempel", short: "Promo" },
+  ];
+  const VARIANT_BY_CODE = VARIANTS.reduce((m, v) => (m[v.code] = v, m), {});
+
+  // Decide which variants to offer in the picker.
+  // If the API gave us reliable data, only show available ones.
+  // Otherwise show all (better to over-offer than to silently hide).
+  function offerableVariants(apiVariants) {
+    if (!apiVariants || typeof apiVariants !== "object") return VARIANTS.slice();
+    const trueCount = VARIANTS.filter(v => apiVariants[v.code] === true).length;
+    // If suspiciously empty (no variants flagged true), assume API was incomplete and show all
+    if (trueCount === 0) return VARIANTS.slice();
+    return VARIANTS.filter(v => apiVariants[v.code] === true);
+  }
+
+  // ============ State ============
+  // collection.pokemonOrder: array of pokemonName strings — the user's manual ordering
+  // for the shelf view. Pokémon not in this array get appended at the end.
+  let collection = { cards: {}, pokemonOrder: [] };
+  let view = { name: "pokedex" };
+  let searchQuery = "";
+  let modalState = null;
+  let dragState = null;
+
+  // Auth & sync state
+  let user = null; // { id, email } or null
+  let authState = { mode: "login", loading: false, error: "", info: "" }; // when user is null
+  let syncStatus = "idle"; // "idle" | "syncing" | "synced" | "error"
+  let syncTimer = null;    // debounce timer for outgoing sync
+  let lastSyncedJson = ""; // memo to avoid syncing identical state
+  let initialLoadDone = false;
+
+  // ============ Persistence ============
+  // Strategy: localStorage acts as a fast local cache + offline buffer.
+  // Supabase is the source of truth across devices.
+  // On login: try to fetch remote, fall back to local if offline.
+  // On every mutation: update local immediately, debounce-sync to remote.
+
+  function loadCollectionLocal() {
+    try {
+      // Per-user key so different accounts on the same browser don't clash
+      const key = userKey();
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        collection = parsed;
+        if (!collection.cards) collection.cards = {};
+        if (!Array.isArray(collection.pokemonOrder)) collection.pokemonOrder = [];
+        return;
+      }
+      // No data under user-scoped key yet. Try to migrate legacy v2 data on first login.
+      collection = { cards: {}, pokemonOrder: [] };
+      if (user) {
+        const legacy = localStorage.getItem(STORAGE_KEY);
+        if (legacy) {
+          try {
+            const old = JSON.parse(legacy);
+            if (old && old.cards) {
+              collection = old;
+              if (!collection.cards) collection.cards = {};
+              if (!Array.isArray(collection.pokemonOrder)) collection.pokemonOrder = [];
+            }
+          } catch (e) { /* ignore */ }
+        }
+        const veryLegacy = localStorage.getItem("poke-collection-v1");
+        if (veryLegacy && Object.keys(collection.cards).length === 0) {
+          try {
+            const old = JSON.parse(veryLegacy);
+            for (const id in old.cards) {
+              const c = old.cards[id];
+              delete c.condition;
+              delete c.location;
+              collection.cards[id] = c;
+            }
+          } catch (e) { /* ignore */ }
+        }
+      }
+    } catch (e) {
+      console.error("Local load failed", e);
+      collection = { cards: {}, pokemonOrder: [] };
+    }
+  }
+
+  function userKey() {
+    return user ? "poke-collection-v2:" + user.id : STORAGE_KEY;
+  }
+
+  function saveCollectionLocal() {
+    try {
+      localStorage.setItem(userKey(), JSON.stringify(collection));
+    } catch (e) {
+      console.error("Local save failed", e);
+    }
+  }
+
+  // Compatibility shim: any code that calls saveCollection() now triggers
+  // local save + scheduled remote sync.
+  function saveCollection() {
+    saveCollectionLocal();
+    if (user && supa) scheduleSync();
+  }
+
+  // ============ Supabase sync ============
+  async function loadFromRemote() {
+    if (!user || !supa) return false;
+    syncStatus = "syncing";
+    try {
+      const { data, error } = await supa
+        .from("collections")
+        .select("data")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (data && data.data) {
+        // Sanity check + merge defaults
+        const remote = data.data;
+        if (!remote.cards) remote.cards = {};
+        if (!Array.isArray(remote.pokemonOrder)) remote.pokemonOrder = [];
+        collection = remote;
+        saveCollectionLocal();
+        lastSyncedJson = JSON.stringify(collection);
+      } else {
+        // No remote row yet — first time this user signs in.
+        // If we have local data (e.g. legacy migration), push it up.
+        // Otherwise start fresh.
+        lastSyncedJson = "";
+        if (collection.cards && Object.keys(collection.cards).length > 0) {
+          await pushToRemote();
+        }
+      }
+      syncStatus = "synced";
+      return true;
+    } catch (e) {
+      console.error("Remote load failed", e);
+      syncStatus = "error";
+      return false;
+    }
+  }
+
+  async function pushToRemote() {
+    if (!user || !supa) return;
+    const json = JSON.stringify(collection);
+    if (json === lastSyncedJson) {
+      syncStatus = "synced";
+      renderSyncIndicator();
+      return;
+    }
+    syncStatus = "syncing";
+    renderSyncIndicator();
+    try {
+      const { error } = await supa
+        .from("collections")
+        .upsert({
+          user_id: user.id,
+          data: collection,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
+      if (error) throw error;
+      lastSyncedJson = json;
+      syncStatus = "synced";
+    } catch (e) {
+      console.error("Remote push failed", e);
+      syncStatus = "error";
+    }
+    renderSyncIndicator();
+  }
+
+  // Debounce: wait 1.2s after last change, then push
+  function scheduleSync() {
+    syncStatus = "syncing";
+    renderSyncIndicator();
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      syncTimer = null;
+      pushToRemote();
+    }, 1200);
+  }
+
+  // Update only the sync indicator without full re-render (faster, preserves focus)
+  function renderSyncIndicator() {
+    const el = document.getElementById("sync-indicator");
+    if (!el) return;
+    el.className = "sync-indicator " + syncStatus;
+    const labels = {
+      idle: "—",
+      syncing: "Synchronisiere …",
+      synced: "Synchronisiert",
+      error: "Sync-Fehler"
+    };
+    el.innerHTML = '<span class="dot"></span><span>' + labels[syncStatus] + '</span>';
+  }
+
+  // ============ Auth ============
+  async function checkSession() {
+    if (!supa) return null;
+    try {
+      const { data: { session } } = await supa.auth.getSession();
+      if (session && session.user) {
+        user = { id: session.user.id, email: session.user.email };
+        return user;
+      }
+    } catch (e) {
+      console.error("Session check failed", e);
+    }
+    user = null;
+    return null;
+  }
+
+  async function signUp(email, password) {
+    if (!supa) throw new Error("Supabase nicht geladen.");
+    const { data, error } = await supa.auth.signUp({ email, password });
+    if (error) throw error;
+    if (data.user) user = { id: data.user.id, email: data.user.email };
+    return data;
+  }
+
+  async function signIn(email, password) {
+    if (!supa) throw new Error("Supabase nicht geladen.");
+    const { data, error } = await supa.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.user) user = { id: data.user.id, email: data.user.email };
+    return data;
+  }
+
+  async function signOut() {
+    if (!supa) return;
+    await supa.auth.signOut();
+    user = null;
+    collection = { cards: {}, pokemonOrder: [] };
+    initialLoadDone = false;
+    render();
+  }
+
+  function renderAuthScreen() {
+    const a = authState;
+    const isSignup = a.mode === "signup";
+    return '<div class="auth-screen">' +
+      '<h1>Pokémon-Sammlung</h1>' +
+      '<div class="auth-subtitle">' + (isSignup ? "Erstelle ein Konto" : "Logge dich ein") + '</div>' +
+      '<div class="auth-tabs">' +
+        '<button class="tab ' + (!isSignup ? "active" : "") + '" data-auth-tab="login">Login</button>' +
+        '<button class="tab ' + (isSignup ? "active" : "") + '" data-auth-tab="signup">Registrieren</button>' +
+      '</div>' +
+      (a.error ? '<div class="auth-status error">' + escHtml(a.error) + '</div>' : "") +
+      (a.info ? '<div class="auth-status info">' + escHtml(a.info) + '</div>' : "") +
+      '<form class="auth-form" id="auth-form">' +
+        '<div>' +
+          '<label>E-Mail</label>' +
+          '<input type="email" id="auth-email" required autocomplete="email" placeholder="du@example.com">' +
+        '</div>' +
+        '<div>' +
+          '<label>Passwort</label>' +
+          '<input type="password" id="auth-password" required minlength="6" autocomplete="' + (isSignup ? "new-password" : "current-password") + '" placeholder="Mindestens 6 Zeichen">' +
+        '</div>' +
+        '<button type="submit" class="btn-primary" style="justify-content: center; margin-top: 4px;"' + (a.loading ? " disabled" : "") + '>' +
+          (a.loading ? '<span class="spinner"></span>' : "") + ' ' +
+          (isSignup ? "Konto erstellen" : "Einloggen") +
+        '</button>' +
+      '</form>' +
+    '</div>';
+  }
+
+  async function handleAuthSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById("auth-email").value.trim();
+    const password = document.getElementById("auth-password").value;
+    if (!email || !password) return;
+    authState.loading = true;
+    authState.error = "";
+    authState.info = "";
+    render();
+    try {
+      if (authState.mode === "signup") {
+        await signUp(email, password);
+        if (!user) {
+          // E-Mail-Bestätigung aktiv
+          authState.info = "Konto erstellt. Bitte bestätige deine E-Mail-Adresse und logge dich dann ein.";
+          authState.mode = "login";
+          authState.loading = false;
+          render();
+          return;
+        }
+      } else {
+        await signIn(email, password);
+      }
+      authState.loading = false;
+      // Trigger initial load
+      await afterLogin();
+    } catch (err) {
+      authState.loading = false;
+      authState.error = translateAuthError(err);
+      render();
+    }
+  }
+
+  function translateAuthError(err) {
+    const msg = (err && err.message) ? err.message : String(err);
+    if (/invalid login/i.test(msg)) return "E-Mail oder Passwort falsch.";
+    if (/already registered/i.test(msg)) return "Diese E-Mail-Adresse ist bereits registriert. Logge dich stattdessen ein.";
+    if (/email.*confirm/i.test(msg)) return "Bitte bestätige zuerst deine E-Mail-Adresse.";
+    if (/password.*6/i.test(msg)) return "Passwort muss mindestens 6 Zeichen lang sein.";
+    return msg;
+  }
+
+  async function afterLogin() {
+    loadCollectionLocal();
+    await loadFromRemote();
+    initialLoadDone = true;
+    render();
+  }
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function escHtml(s) {
+    if (s == null) return "";
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function rarityScore(r) {
+    if (!r) return 0;
+    const order = ["Common", "Uncommon", "Rare", "Holo Rare", "Ultra Rare", "Secret Rare", "Rare Holo", "Rare Holo EX", "Rare Holo GX", "Rare Holo V", "Rare Holo VMAX", "Rare Ultra", "Rare Secret", "Rare Rainbow", "Rare Shiny", "Illustration Rare", "Special Illustration Rare", "Hyper Rare"];
+    const i = order.findIndex(x => r.toLowerCase().includes(x.toLowerCase()));
+    return i === -1 ? 1 : i + 1;
+  }
+
+  function cardsArr() {
+    return Object.entries(collection.cards).map(([id, c]) => Object.assign({ id }, c));
+  }
+
+  // Group cards by pokémon name, sort cards within each group by the chosen field,
+  // and order the groups according to collection.pokemonOrder.
+  // Pokémon present in cards but not yet in pokemonOrder are appended at the end (newest first).
+  function groupedPokemonInOrder(sortBy) {
+    sortBy = sortBy || "year";
+    const cards = cardsArr();
+    const map = {};
+    for (const c of cards) {
+      if (!map[c.pokemonName]) map[c.pokemonName] = { name: c.pokemonName, items: [], total: 0 };
+      map[c.pokemonName].items.push(c);
+      map[c.pokemonName].total += Number(c.quantity) || 1;
+    }
+    // Sort cards within each group
+    const cmp = shelfCardComparator(sortBy);
+    for (const k in map) {
+      map[k].items.sort(cmp);
+    }
+    // Apply manual ordering for the rows themselves
+    const ordered = [];
+    const seen = new Set();
+    for (const name of collection.pokemonOrder) {
+      if (map[name]) {
+        ordered.push(map[name]);
+        seen.add(name);
+      }
+    }
+    const remaining = Object.values(map).filter(g => !seen.has(g.name)).sort((a, b) => a.name.localeCompare(b.name));
+    return ordered.concat(remaining);
+  }
+
+  // Comparator factory for sorting cards within a shelf row.
+  // year: chronological by release date (oldest -> newest), tiebreak on card number
+  // set: alphabetical by set name, tiebreak on card number
+  // setChronological: sets ordered by their first release date, cards within same set by number
+  function shelfCardComparator(sortBy) {
+    if (sortBy === "set") {
+      return (a, b) => {
+        const s = (a.setName || "").localeCompare(b.setName || "");
+        if (s !== 0) return s;
+        return cardNumberCompare(a.cardNumber, b.cardNumber);
+      };
+    }
+    if (sortBy === "setChronological") {
+      return (a, b) => {
+        const d = (a.releaseDate || "").localeCompare(b.releaseDate || "");
+        if (d !== 0) return d;
+        const s = (a.setName || "").localeCompare(b.setName || "");
+        if (s !== 0) return s;
+        return cardNumberCompare(a.cardNumber, b.cardNumber);
+      };
+    }
+    // default: year
+    return (a, b) => {
+      const d = (a.releaseDate || "").localeCompare(b.releaseDate || "");
+      if (d !== 0) return d;
+      return cardNumberCompare(a.cardNumber, b.cardNumber);
+    };
+  }
+
+  function cardNumberCompare(a, b) {
+    const na = parseInt(String(a || ""), 10);
+    const nb = parseInt(String(b || ""), 10);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return String(a || "").localeCompare(String(b || ""));
+  }
+
+  // Move a pokémon from its current position to a new index in the order
+  function reorderPokemon(name, newIndex) {
+    // Build the canonical list first (which appends unsorted ones)
+    const all = groupedPokemonInOrder("year").map(g => g.name);
+    const fromIndex = all.indexOf(name);
+    if (fromIndex === -1) return;
+    if (newIndex < 0) newIndex = 0;
+    if (newIndex >= all.length) newIndex = all.length - 1;
+    if (newIndex === fromIndex) return;
+    all.splice(fromIndex, 1);
+    all.splice(newIndex, 0, name);
+    collection.pokemonOrder = all;
+    saveCollection();
+  }
+
+  // Format a release date string (YYYY-MM-DD) to just the year
+  function yearOf(dateStr) {
+    if (!dateStr) return "";
+    const m = String(dateStr).match(/^(\d{4})/);
+    return m ? m[1] : "";
+  }
+
+  // Build TCGdex image URL: stored card.imageBase + "/" + quality + "." + format
+  function imgUrl(base, quality, format) {
+    if (!base) return "";
+    return base + "/" + (quality || "low") + "." + (format || "webp");
+  }
+
+  // ============ Mutations ============
+  function addCard(entry) {
+    const id = entry.cardId + "-" + uid();
+    collection.cards[id] = Object.assign({}, entry, { addedAt: Date.now() });
+    saveCollection();
+    render();
+  }
+
+  function removeCard(id) {
+    if (!confirm("Diese Karte aus der Sammlung entfernen?")) return;
+    const removed = collection.cards[id];
+    delete collection.cards[id];
+    // If this was the last card of that pokémon, drop it from the manual order
+    if (removed) {
+      const stillThere = Object.values(collection.cards).some(c => c.pokemonName === removed.pokemonName);
+      if (!stillThere) {
+        collection.pokemonOrder = collection.pokemonOrder.filter(n => n !== removed.pokemonName);
+      }
+    }
+    saveCollection();
+    render();
+  }
+
+  function updateCard(id, patch) {
+    if (!collection.cards[id]) return;
+    Object.assign(collection.cards[id], patch);
+    saveCollection();
+    render();
+  }
+
+  function exportJson() {
+    const blob = new Blob([JSON.stringify(collection, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pokemon-collection-" + new Date().toISOString().slice(0, 10) + ".json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importJson(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.cards || typeof data.cards !== "object") throw new Error("Ungültiges Format");
+        if (!confirm("Bestehende Sammlung mit " + Object.keys(data.cards).length + " importierten Karten zusammenführen?")) return;
+        Object.assign(collection.cards, data.cards);
+        saveCollection();
+        render();
+      } catch (err) {
+        alert("Import fehlgeschlagen: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ============ Rendering ============
+  const app = document.getElementById("app");
+
+  function render() {
+    // Not logged in → show auth screen
+    if (!user) {
+      app.innerHTML = renderAuthScreen();
+      attachAuthHandlers();
+      return;
+    }
+    // Logged in but initial remote load not done yet
+    if (!initialLoadDone) {
+      app.innerHTML = '<div class="center-loader"><div class="spinner"></div></div>';
+      return;
+    }
+
+    const cards = cardsArr();
+    const totalCount = cards.reduce((s, c) => s + (Number(c.quantity) || 1), 0);
+    const uniquePokemon = new Set(cards.map(c => c.pokemonName)).size;
+
+    let body = "";
+    if (view.name === "pokedex") body = renderPokedex(cards);
+    else if (view.name === "pokemon") body = renderPokemonDetail(cards.filter(c => c.pokemonName === view.pokemonName));
+    else if (view.name === "artists") body = renderArtists(cards);
+    else if (view.name === "artist") body = renderArtistDetail(cards.filter(c => c.artist === view.artist));
+    else if (view.name === "search") body = renderSearch(cards);
+
+    app.innerHTML =
+      '<div class="header">' +
+        '<div>' +
+          '<h1>Meine Sammlung <span class="sync-indicator ' + syncStatus + '" id="sync-indicator"><span class="dot"></span><span>' + syncLabel() + '</span></span></h1>' +
+          '<div class="header-meta">' + totalCount + ' Karten · ' + uniquePokemon + ' verschiedene Pokémon</div>' +
+        '</div>' +
+        '<div class="header-actions">' +
+          '<button class="btn-primary" id="btn-add">' + plusIcon() + ' Karte hinzufügen</button>' +
+          '<button class="btn-icon" id="btn-export" title="Als JSON exportieren">' + downloadIcon() + '</button>' +
+          '<button class="btn-icon" id="btn-import" title="JSON importieren">' + uploadIcon() + '</button>' +
+          '<input type="file" id="import-file" accept="application/json" class="hidden">' +
+          '<button class="user-chip" id="btn-user" title="Klicken zum Ausloggen">' + escHtml(user.email) + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="tabs">' +
+        '<button class="tab ' + (view.name === "pokedex" || view.name === "pokemon" ? "active" : "") + '" data-tab="pokedex">' + gridIcon() + ' Nach Pokémon</button>' +
+        '<button class="tab ' + (view.name === "artists" || view.name === "artist" ? "active" : "") + '" data-tab="artists">' + paletteIcon() + ' Nach Künstler:in</button>' +
+        '<button class="tab ' + (view.name === "search" ? "active" : "") + '" data-tab="search">' + searchIcon() + ' Suche</button>' +
+      '</div>' +
+      body +
+      (modalState ? renderModal() : "");
+
+    attachHandlers();
+  }
+
+  function syncLabel() {
+    return ({
+      idle: "—",
+      syncing: "Synchronisiere …",
+      synced: "Synchronisiert",
+      error: "Sync-Fehler"
+    })[syncStatus] || "—";
+  }
+
+  function attachAuthHandlers() {
+    document.querySelectorAll("[data-auth-tab]").forEach(el => {
+      el.addEventListener("click", () => {
+        authState.mode = el.dataset.authTab;
+        authState.error = "";
+        authState.info = "";
+        render();
+      });
+    });
+    const form = document.getElementById("auth-form");
+    if (form) form.addEventListener("submit", handleAuthSubmit);
+  }
+
+  function renderPokedex(cards) {
+    if (cards.length === 0) {
+      return '<div class="empty">' +
+        '<div class="empty-title">Noch keine Karten in der Sammlung</div>' +
+        '<div class="empty-body">Klicke auf <b>Karte hinzufügen</b>, um deine erste Karte zu erfassen. Du kannst nach dem Pokémon-Namen in vier Sprachen (DE/EN/JA/ID) suchen.</div>' +
+      '</div>';
+    }
+    const sortBy = view.shelfSortBy || "year";
+    const groups = groupedPokemonInOrder(sortBy);
+    const header =
+      '<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap;">' +
+        '<div style="font-size: 12px; color: var(--text-2); flex: 1; min-width: 240px;">Reihen-Reihenfolge per Griff <span style="font-size: 14px;">⋮⋮</span> umsortieren.</div>' +
+        '<div style="display: flex; align-items: center; gap: 8px;">' +
+          '<label style="font-size: 12px; color: var(--text-2);">Karten sortieren:</label>' +
+          '<select id="shelf-sort" style="width: auto; min-width: 180px;">' +
+            '<option value="year"' + (sortBy === "year" ? " selected" : "") + '>Nach Jahr</option>' +
+            '<option value="set"' + (sortBy === "set" ? " selected" : "") + '>Nach Set (alphabetisch)</option>' +
+            '<option value="setChronological"' + (sortBy === "setChronological" ? " selected" : "") + '>Nach Set (chronologisch)</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>';
+    const rows = groups.map(g => {
+      const cardsHtml = g.items.map(c => {
+        const imgSrc = c.imageBase ? imgUrl(c.imageBase, "low", "webp") : "";
+        const setLabel = c.setName || "—";
+        const yr = yearOf(c.releaseDate);
+        return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
+          '<div class="shelf-card-img">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(c.pokemonName) + '" loading="lazy">' : "") + '</div>' +
+          '<div class="shelf-card-set">' + escHtml(setLabel) + '</div>' +
+          (yr ? '<div class="shelf-card-year">' + escHtml(yr) + '</div>' : "") +
+        '</div>';
+      }).join("");
+      const cardWord = g.items.length === 1 ? "Karte" : "Karten";
+      return '<div class="shelf-row" data-pokemon="' + escHtml(g.name) + '">' +
+        '<div class="shelf-handle" data-handle="' + escHtml(g.name) + '" title="Ziehen zum Umsortieren">⋮⋮</div>' +
+        '<div class="shelf-name" data-open-pokemon="' + escHtml(g.name) + '">' +
+          '<div class="shelf-name-title">' + escHtml(g.name) + '</div>' +
+          '<div class="shelf-name-meta">' + g.items.length + ' ' + cardWord + '</div>' +
+        '</div>' +
+        '<div class="shelf-cards">' + cardsHtml + '</div>' +
+      '</div>';
+    }).join("");
+    return header + '<div class="shelf-container">' + rows + '</div>';
+  }
+
+  function renderPokemonDetail(cards) {
+    const sortBy = view.sortBy || "year";
+    const sorted = cards.slice();
+    if (sortBy === "year") sorted.sort((a, b) => (a.releaseDate || "").localeCompare(b.releaseDate || ""));
+    else if (sortBy === "artist") sorted.sort((a, b) => (a.artist || "").localeCompare(b.artist || ""));
+    else if (sortBy === "rarity") sorted.sort((a, b) => rarityScore(b.rarity) - rarityScore(a.rarity));
+    else if (sortBy === "set") sorted.sort((a, b) => (a.setName || "").localeCompare(b.setName || ""));
+    else if (sortBy === "language") sorted.sort((a, b) => (a.language || "").localeCompare(b.language || ""));
+    else if (sortBy === "variant") sorted.sort((a, b) => (a.variant || "").localeCompare(b.variant || ""));
+
+    return '' +
+      '<div class="detail-header">' +
+        '<button class="btn-ghost" data-action="back-pokedex">' + backIcon() + ' Zurück</button>' +
+        '<h2 class="detail-title">' + escHtml(view.pokemonName) + '</h2>' +
+        '<select class="detail-sort" id="sort-select">' +
+          '<option value="year"' + (sortBy === "year" ? " selected" : "") + '>Nach Jahr</option>' +
+          '<option value="artist"' + (sortBy === "artist" ? " selected" : "") + '>Nach Künstler:in</option>' +
+          '<option value="rarity"' + (sortBy === "rarity" ? " selected" : "") + '>Nach Seltenheit</option>' +
+          '<option value="set"' + (sortBy === "set" ? " selected" : "") + '>Nach Set</option>' +
+          '<option value="variant"' + (sortBy === "variant" ? " selected" : "") + '>Nach Variante</option>' +
+          '<option value="language"' + (sortBy === "language" ? " selected" : "") + '>Nach Sprache</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="grid-cards">' + sorted.map(renderCardTile).join("") + '</div>';
+  }
+
+  function renderArtists(cards) {
+    if (cards.length === 0) {
+      return '<div class="empty">' +
+        '<div class="empty-title">Noch keine Karten</div>' +
+        '<div class="empty-body">Sobald du Karten hinzufügst, erscheinen die Illustrator:innen hier.</div>' +
+      '</div>';
+    }
+    const map = {};
+    for (const c of cards) {
+      const a = c.artist || "Unbekannt";
+      if (!map[a]) map[a] = { name: a, items: [], pokemon: new Set() };
+      map[a].items.push(c);
+      map[a].pokemon.add(c.pokemonName);
+    }
+    const grouped = Object.values(map).sort((a, b) => b.items.length - a.items.length);
+    return '<div class="grid-artists">' + grouped.map(g =>
+      '<button class="artist-tile" data-artist="' + escHtml(g.name) + '">' +
+        '<div class="tile-title">' + escHtml(g.name) + '</div>' +
+        '<div class="tile-meta">' + g.items.length + ' Karten · ' + g.pokemon.size + ' Pokémon</div>' +
+      '</button>'
+    ).join("") + '</div>';
+  }
+
+  function renderArtistDetail(cards) {
+    return '' +
+      '<div class="detail-header">' +
+        '<button class="btn-ghost" data-action="back-artists">' + backIcon() + ' Zurück</button>' +
+        '<h2>' + escHtml(view.artist) + '</h2>' +
+        '<div></div>' +
+      '</div>' +
+      '<div class="grid-cards">' + cards.map(renderCardTile).join("") + '</div>';
+  }
+
+  function renderSearch(cards) {
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q ? cards.filter(c =>
+      [c.pokemonName, c.setName, c.artist, c.cardNumber, c.notes, c.rarity, c.language, c.variant]
+        .filter(Boolean)
+        .some(s => String(s).toLowerCase().includes(q))
+    ) : cards;
+    return '<input type="text" id="global-search" value="' + escHtml(searchQuery) + '" placeholder="Suche in deiner Sammlung — Name, Set, Künstler:in, Notiz..." style="margin-bottom: 16px;">' +
+      '<div class="results-count">' + filtered.length + ' Treffer</div>' +
+      '<div class="grid-cards">' + filtered.map(renderCardTile).join("") + '</div>';
+  }
+
+  function renderCardTile(card) {
+    const imgSrc = card.imageBase ? imgUrl(card.imageBase, "high", "webp") : "";
+    const langLabel = card.language ? (LANG_BY_CODE[card.language] ? LANG_BY_CODE[card.language].short : card.language) : "";
+    const variantLabel = card.variant && VARIANT_BY_CODE[card.variant] ? VARIANT_BY_CODE[card.variant].short : "";
+    return '<div class="card" data-card-id="' + escHtml(card.id) + '">' +
+      '<div class="card-img card-img-wrap">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(card.pokemonName) + '" loading="lazy">' : "") + '</div>' +
+      '<div class="card-body">' +
+        '<div class="card-title">' + escHtml(card.pokemonName) + '</div>' +
+        '<div class="card-meta">' + escHtml(card.setName || "") + ' · ' + escHtml(card.cardNumber || "") + '</div>' +
+        (card.artist ? '<div class="card-artist">Illus. ' + escHtml(card.artist) + '</div>' : "") +
+        '<div class="pills">' +
+          (card.rarity ? '<span class="pill">' + escHtml(card.rarity) + '</span>' : "") +
+          (variantLabel ? '<span class="pill pill-info">' + escHtml(variantLabel) + '</span>' : "") +
+          ((Number(card.quantity) || 1) > 1 ? '<span class="pill">×' + Number(card.quantity) + '</span>' : "") +
+          (langLabel ? '<span class="pill pill-warn">' + escHtml(langLabel) + '</span>' : "") +
+        '</div>' +
+        '<button class="card-toggle" data-toggle="' + escHtml(card.id) + '">Details bearbeiten ' + chevronIcon() + '</button>' +
+        '<div class="card-edit" data-edit="' + escHtml(card.id) + '">' +
+          '<div>' +
+            '<label class="field-label">Anzahl</label>' +
+            '<input type="number" min="1" data-field="quantity" value="' + escHtml(card.quantity || 1) + '">' +
+          '</div>' +
+          '<div>' +
+            '<label class="field-label">Variante</label>' +
+            '<select data-field="variant">' + variantOptions(card.variant || "normal") + '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label class="field-label">Sprache</label>' +
+            '<select data-field="language">' + languageOptions(card.language || "en") + '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label class="field-label">Notiz</label>' +
+            '<textarea data-field="notes" rows="2" style="resize: vertical;">' + escHtml(card.notes || "") + '</textarea>' +
+          '</div>' +
+          '<div style="display: flex; gap: 6px; margin-top: 4px;">' +
+            '<button class="btn-primary" data-save="' + escHtml(card.id) + '" style="flex: 1; justify-content: center;">Speichern</button>' +
+            '<button class="btn-icon danger-text" data-delete="' + escHtml(card.id) + '" title="Löschen">' + trashIcon() + '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function languageOptions(selected) {
+    return LANGS.map(l => '<option value="' + l.code + '"' + (selected === l.code ? " selected" : "") + '>' + l.label + '</option>').join("");
+  }
+
+  // Render a row of pill-buttons for choosing the variant.
+  // Uses offerableVariants() which falls back to "all" if the API didn't provide reliable data.
+  function renderVariantPicker(available, selectedCode) {
+    const offered = offerableVariants(available);
+    const buttons = offered.map(v =>
+      '<button type="button" class="lang-btn ' + (selectedCode === v.code ? "active" : "") + '" data-variant="' + v.code + '">' + v.label + '</button>'
+    ).join("");
+    return '<div><label class="field-label">Variante</label><div class="lang-row" id="variant-picker">' + buttons + '</div></div>';
+  }
+
+  // For the per-card edit panel, render a select with all 4 variants
+  // (we don't know availableVariants there, so allow free choice).
+  function variantOptions(selected) {
+    return VARIANTS.map(v => '<option value="' + v.code + '"' + (selected === v.code ? " selected" : "") + '>' + v.label + '</option>').join("");
+  }
+
+  function renderModal() {
+    const m = modalState;
+    let inner = "";
+
+    if (m.selected) {
+      const sel = m.selected;
+      const imgSrc = sel.imageBase ? imgUrl(sel.imageBase, "high", "webp") : "";
+      const langLabel = LANG_BY_CODE[m.lang] ? LANG_BY_CODE[m.lang].label : m.lang;
+      inner = '<div class="selected-grid">' +
+        '<div>' +
+          (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(sel.name) + '">' : "") +
+          '<button class="btn-ghost" id="modal-back-results" style="width: 100%; margin-top: 8px; justify-content: center; font-size: 12px;">← Andere wählen</button>' +
+        '</div>' +
+        '<div class="form-stack">' +
+          '<div class="selected-name">' + escHtml(sel.name) + '</div>' +
+          '<div class="selected-meta">' +
+            escHtml(sel.setName || "") + ' · ' + escHtml(sel.cardNumber || "") + (sel.rarity ? ' · ' + escHtml(sel.rarity) : "") + '<br>' +
+            'Illus. ' + escHtml(sel.artist || "—") + (sel.releaseDate ? ' · ' + escHtml(sel.releaseDate) : "") + '<br>' +
+            'Sprache: <b>' + escHtml(langLabel) + '</b>' +
+          '</div>' +
+          renderVariantPicker(sel.availableVariants, m.meta.variant) +
+          '<div><label class="field-label">Anzahl</label><input type="number" min="1" id="m-quantity" value="' + escHtml(m.meta.quantity) + '"></div>' +
+          '<div><label class="field-label">Notiz</label><input type="text" id="m-notes" value="' + escHtml(m.meta.notes) + '" placeholder="Optional"></div>' +
+          '<button class="btn-primary" id="modal-confirm-add" style="justify-content: center; margin-top: 4px;">Zur Sammlung hinzufügen</button>' +
+        '</div>' +
+      '</div>';
+    } else {
+      const langButtons = LANGS.map(l =>
+        '<button class="lang-btn ' + (m.lang === l.code ? "active" : "") + '" data-lang="' + l.code + '">' + l.label + '</button>'
+      ).join("");
+
+      inner =
+        '<p class="modal-help">Sprache wählen, dann suchen — nach Name (<code>Pikachu</code>), Name + Nummer (<code>Pikachu 20</code>) oder nur Nummer (<code>20/108</code>).</p>' +
+        '<div class="lang-row">' + langButtons + '</div>' +
+        '<div class="search-row">' +
+          '<input type="text" id="modal-query" value="' + escHtml(m.query) + '" placeholder="Pokémon-Name in der gewählten Sprache...">' +
+          '<button class="btn-primary" id="modal-do-search"' + (m.loading ? " disabled" : "") + '>' +
+            (m.loading ? '<span class="spinner"></span>' : searchIcon()) + ' Suchen' +
+          '</button>' +
+        '</div>' +
+        (m.error ? '<div class="error-box">' + escHtml(m.error) + '</div>' : "") +
+        (m.results.length > 0 ?
+          '<div class="results-grid">' + m.results.map(r => {
+            const tImg = r.image ? r.image + "/low.webp" : "";
+            return '<button class="result-tile" data-result-id="' + escHtml(r.id) + '">' +
+              '<div class="card-img-wrap">' + (tImg ? '<img src="' + escHtml(tImg) + '" alt="' + escHtml(r.name) + '" loading="lazy">' : "") + '</div>' +
+              '<div class="result-name">' + escHtml(r.name) + '</div>' +
+              '<div class="result-num">' + escHtml(r.id) + '</div>' +
+            '</button>';
+          }).join("") + '</div>' : "") +
+        (m.loadingDetail ? '<div style="padding: 12px; text-align: center; color: var(--text-2); font-size: 13px;"><span class="spinner"></span> Lade Kartendetails...</div>' : "");
+    }
+
+    return '<div class="modal-overlay" id="modal-overlay">' +
+      '<div class="modal" id="modal-inner">' +
+        '<div class="modal-header">' +
+          '<h3>Karte hinzufügen</h3>' +
+          '<button class="btn-icon" id="modal-close">' + xIcon() + '</button>' +
+        '</div>' +
+        inner +
+      '</div>' +
+    '</div>';
+  }
+
+  // ============ Modal logic ============
+  function openModal() {
+    modalState = {
+      results: [],
+      loading: false,
+      loadingDetail: false,
+      error: "",
+      selected: null,
+      query: "",
+      lang: "de",
+      meta: { quantity: 1, notes: "", variant: "normal" }
+    };
+    render();
+    setTimeout(() => {
+      const q = document.getElementById("modal-query");
+      if (q) q.focus();
+    }, 50);
+  }
+
+  function closeModal() {
+    modalState = null;
+    render();
+  }
+
+  async function doApiSearch() {
+    const input = document.getElementById("modal-query");
+    if (!input) return;
+    const q = input.value.trim();
+    if (!q) return;
+    modalState.query = q;
+    modalState.loading = true;
+    modalState.error = "";
+    modalState.results = [];
+    render();
+    try {
+      const parts = parseQuery(q);
+      // Strategy: ALWAYS query the API by name (or fetch all cards if no name given,
+      // which we don't want — so require a name OR use a number-only search via localId).
+      // Then filter localId client-side, which sidesteps padding/format issues like
+      // "020" vs "20", or "XY95" mixed with set prefixes.
+      let url;
+      if (parts.name) {
+        url = API_BASE + "/" + modalState.lang + "/cards?name=" + encodeURIComponent(parts.name);
+      } else if (parts.localId) {
+        // Number-only query: laxist match against localId (no eq:, allows "20" to find "020")
+        url = API_BASE + "/" + modalState.lang + "/cards?localId=" + encodeURIComponent(parts.localId);
+      } else {
+        url = API_BASE + "/" + modalState.lang + "/cards?name=" + encodeURIComponent(q);
+      }
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("API-Fehler " + res.status);
+      const data = await res.json();
+      let results = Array.isArray(data) ? data : [];
+
+      // If the user gave a card number alongside the name, filter client-side.
+      // Compare numerically to handle "020" === "20" === 20.
+      if (parts.name && parts.localId) {
+        const targetNum = parseInt(parts.localId, 10);
+        results = results.filter(r => {
+          if (r.localId == null) return false;
+          const n = parseInt(String(r.localId), 10);
+          return !isNaN(n) && n === targetNum;
+        });
+      }
+
+      modalState.results = results.slice(0, 50);
+      modalState.loading = false;
+      if (modalState.results.length === 0) {
+        const langLabel = LANG_BY_CODE[modalState.lang] ? LANG_BY_CODE[modalState.lang].label : modalState.lang;
+        modalState.error = 'Keine Treffer für "' + q + '" in ' + langLabel + '. Tipps: nur den Pokémon-Namen suchen ("Pikachu"), oder Name + Nummer ("Pikachu 20"), oder nur die Nummer ("20").';
+      }
+    } catch (e) {
+      modalState.loading = false;
+      modalState.error = "Suche fehlgeschlagen: " + e.message;
+    }
+    render();
+  }
+
+  // Parse user query into { name, localId }. Examples:
+  //   "Pikachu"          -> { name: "Pikachu", localId: "" }
+  //   "Pikachu 20"       -> { name: "Pikachu", localId: "20" }
+  //   "Pikachu 20/108"   -> { name: "Pikachu", localId: "20" }
+  //   "20/108"           -> { name: "", localId: "20" }
+  //   "20"               -> { name: "", localId: "20" }
+  function parseQuery(raw) {
+    const q = raw.trim();
+    // Match a token like "20" or "20/108" anywhere — the number BEFORE optional "/total"
+    // is treated as the localId.
+    const numMatch = q.match(/(?:^|\s)(\d+)(?:\/\d+)?(?=\s|$)/);
+    if (!numMatch) return { name: q, localId: "" };
+    const localId = numMatch[1];
+    // Strip the matched token (and trailing /total if present) from the string to get the name
+    const name = q.replace(/(?:^|\s)\d+(?:\/\d+)?(?=\s|$)/, " ").trim();
+    return { name: name, localId: localId };
+  }
+
+  async function selectResult(id) {
+    const stub = modalState.results.find(x => x.id === id);
+    if (!stub) return;
+    // Fetch full card details (illustrator, set, rarity, etc.)
+    modalState.loadingDetail = true;
+    render();
+    try {
+      const url = API_BASE + "/" + modalState.lang + "/cards/" + encodeURIComponent(id);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("API-Fehler " + res.status);
+      const card = await res.json();
+      modalState.selected = {
+        cardId: card.id,
+        name: card.name,
+        setName: card.set ? card.set.name : "",
+        setId: card.set ? card.set.id : "",
+        cardNumber: card.localId || "",
+        artist: card.illustrator || "",
+        rarity: card.rarity || "",
+        releaseDate: card.set && card.set.releaseDate ? card.set.releaseDate : "",
+        imageBase: card.image || stub.image || "",
+        availableVariants: card.variants || null,
+      };
+      // Default to "normal" — user actively picks the variant they have
+      modalState.meta.variant = "normal";
+      modalState.loadingDetail = false;
+    } catch (e) {
+      modalState.loadingDetail = false;
+      modalState.error = "Kartendetails konnten nicht geladen werden: " + e.message;
+    }
+    render();
+  }
+
+  function readModalMeta() {
+    const m = modalState.meta;
+    const q = document.getElementById("m-quantity");
+    const n = document.getElementById("m-notes");
+    if (q) m.quantity = q.value;
+    if (n) m.notes = n.value;
+  }
+
+  function confirmAddCard() {
+    readModalMeta();
+    const sel = modalState.selected;
+    if (!sel) return;
+    const entry = {
+      cardId: sel.cardId,
+      pokemonName: sel.name,
+      setName: sel.setName,
+      setId: sel.setId,
+      cardNumber: sel.cardNumber,
+      artist: sel.artist,
+      rarity: sel.rarity,
+      releaseDate: sel.releaseDate,
+      imageBase: sel.imageBase,
+      language: modalState.lang,
+      variant: modalState.meta.variant || "normal",
+      quantity: Number(modalState.meta.quantity) || 1,
+      notes: modalState.meta.notes,
+    };
+    addCard(entry);
+    // Reset for adding another card
+    modalState = {
+      results: modalState.results,
+      loading: false,
+      loadingDetail: false,
+      error: "",
+      selected: null,
+      query: modalState.query,
+      lang: modalState.lang,
+      meta: { quantity: 1, notes: "", variant: "normal" }
+    };
+    render();
+  }
+
+  // ============ Event handlers ============
+  function attachHandlers() {
+    on("#btn-add", "click", openModal);
+    on("#btn-export", "click", exportJson);
+    on("#btn-import", "click", () => document.getElementById("import-file").click());
+    on("#import-file", "change", e => {
+      const f = e.target.files[0];
+      if (f) importJson(f);
+    });
+    on("#btn-user", "click", () => {
+      if (confirm("Wirklich ausloggen? Deine Sammlung bleibt online gespeichert und ist nach erneutem Login wieder verfügbar.")) {
+        signOut();
+      }
+    });
+
+    document.querySelectorAll(".tab").forEach(el => {
+      el.addEventListener("click", () => {
+        view = { name: el.dataset.tab };
+        searchQuery = "";
+        render();
+      });
+    });
+
+    // Shelf: open detail by clicking the Pokémon name
+    document.querySelectorAll("[data-open-pokemon]").forEach(el => {
+      el.addEventListener("click", () => {
+        view = { name: "pokemon", pokemonName: el.dataset.openPokemon };
+        render();
+      });
+    });
+
+    // Shelf: sort selector
+    on("#shelf-sort", "change", e => {
+      view.shelfSortBy = e.target.value;
+      render();
+    });
+
+    // Shelf: open detail by clicking a card thumbnail (jumps to that pokémon's view)
+    document.querySelectorAll(".shelf-card").forEach(el => {
+      el.addEventListener("click", () => {
+        const row = el.closest(".shelf-row");
+        if (row) {
+          view = { name: "pokemon", pokemonName: row.dataset.pokemon };
+          render();
+        }
+      });
+    });
+
+    // Shelf: drag handles for reordering
+    attachDragHandlers();
+
+    document.querySelectorAll(".artist-tile").forEach(el => {
+      el.addEventListener("click", () => {
+        view = { name: "artist", artist: el.dataset.artist };
+        render();
+      });
+    });
+
+    on('[data-action="back-pokedex"]', "click", () => { view = { name: "pokedex" }; render(); });
+    on('[data-action="back-artists"]', "click", () => { view = { name: "artists" }; render(); });
+
+    on("#sort-select", "change", e => {
+      view.sortBy = e.target.value;
+      render();
+    });
+
+    const gs = document.getElementById("global-search");
+    if (gs) {
+      gs.addEventListener("input", e => {
+        searchQuery = e.target.value;
+        const cards = cardsArr();
+        const q = searchQuery.trim().toLowerCase();
+        const filtered = q ? cards.filter(c =>
+          [c.pokemonName, c.setName, c.artist, c.cardNumber, c.notes, c.rarity, c.language, c.variant]
+            .filter(Boolean)
+            .some(s => String(s).toLowerCase().includes(q))
+        ) : cards;
+        document.querySelector(".results-count").textContent = filtered.length + " Treffer";
+        document.querySelector(".grid-cards").innerHTML = filtered.map(renderCardTile).join("");
+        attachCardHandlers();
+      });
+    }
+
+    attachCardHandlers();
+
+    // Modal
+    if (modalState) {
+      on("#modal-close", "click", closeModal);
+      const overlay = document.getElementById("modal-overlay");
+      if (overlay) {
+        overlay.addEventListener("click", e => {
+          if (e.target === overlay) closeModal();
+        });
+      }
+      on("#modal-do-search", "click", doApiSearch);
+      const mq = document.getElementById("modal-query");
+      if (mq) {
+        mq.addEventListener("keydown", e => {
+          if (e.key === "Enter") doApiSearch();
+        });
+      }
+      document.querySelectorAll(".lang-btn[data-lang]").forEach(el => {
+        el.addEventListener("click", () => {
+          modalState.lang = el.dataset.lang;
+          modalState.results = [];
+          modalState.error = "";
+          render();
+        });
+      });
+      document.querySelectorAll(".lang-btn[data-variant]").forEach(el => {
+        el.addEventListener("click", () => {
+          // Preserve user-typed quantity/notes before re-render
+          readModalMeta();
+          modalState.meta.variant = el.dataset.variant;
+          render();
+        });
+      });
+      document.querySelectorAll(".result-tile").forEach(el => {
+        el.addEventListener("click", () => selectResult(el.dataset.resultId));
+      });
+      on("#modal-back-results", "click", () => {
+        readModalMeta();
+        modalState.selected = null;
+        render();
+      });
+      on("#modal-confirm-add", "click", confirmAddCard);
+    }
+  }
+
+  // Drag-and-drop reordering for shelf rows. Uses Pointer Events for
+  // unified mouse + touch handling. The handle (⋮⋮) initiates the drag;
+  // the whole row gets the visual drag state.
+  function attachDragHandlers() {
+    const handles = document.querySelectorAll(".shelf-handle[data-handle]");
+    handles.forEach(handle => {
+      handle.addEventListener("pointerdown", onDragStart);
+    });
+  }
+
+  function onDragStart(e) {
+    e.preventDefault();
+    const handle = e.currentTarget;
+    const row = handle.closest(".shelf-row");
+    if (!row) return;
+    const name = handle.dataset.handle;
+    const allRows = Array.from(document.querySelectorAll(".shelf-row"));
+    const fromIndex = allRows.indexOf(row);
+    if (fromIndex === -1) return;
+
+    dragState = { name, fromIndex, currentDropIndex: fromIndex, currentEdge: "above" };
+    row.classList.add("dragging");
+    try { handle.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+
+    const onMove = (ev) => onDragMove(ev, allRows);
+    const onUp = (ev) => {
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
+      onDragEnd(ev, row);
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  }
+
+  function onDragMove(e, allRows) {
+    if (!dragState) return;
+    const y = e.clientY;
+    let bestIndex = dragState.fromIndex;
+    let bestEdge = "above";
+    for (let i = 0; i < allRows.length; i++) {
+      if (i === dragState.fromIndex) continue;
+      const r = allRows[i];
+      const rect = r.getBoundingClientRect();
+      if (y >= rect.top && y <= rect.bottom) {
+        bestIndex = i;
+        bestEdge = (y < rect.top + rect.height / 2) ? "above" : "below";
+        break;
+      }
+      if (y < rect.top && i === 0) {
+        bestIndex = 0;
+        bestEdge = "above";
+        break;
+      }
+      if (i === allRows.length - 1 && y > rect.bottom) {
+        bestIndex = i;
+        bestEdge = "below";
+      }
+    }
+    // Clear previous indicators
+    allRows.forEach(r => r.classList.remove("drop-above", "drop-below"));
+    if (bestIndex !== dragState.fromIndex) {
+      allRows[bestIndex].classList.add(bestEdge === "above" ? "drop-above" : "drop-below");
+    }
+    dragState.currentDropIndex = bestIndex;
+    dragState.currentEdge = bestEdge;
+  }
+
+  function onDragEnd(e, row) {
+    if (!dragState) return;
+    const allRows = Array.from(document.querySelectorAll(".shelf-row"));
+    allRows.forEach(r => r.classList.remove("drop-above", "drop-below", "dragging"));
+
+    if (dragState.currentDropIndex !== dragState.fromIndex) {
+      // Translate visual drop position into target index in the order array
+      let target = dragState.currentDropIndex;
+      if (dragState.currentEdge === "below") target += 1;
+      // Account for the fact that removing the dragged item shifts indices
+      if (target > dragState.fromIndex) target -= 1;
+      reorderPokemon(dragState.name, target);
+    }
+    dragState = null;
+    render();
+  }
+
+  function attachCardHandlers() {
+    document.querySelectorAll("[data-toggle]").forEach(el => {
+      el.addEventListener("click", () => {
+        const id = el.dataset.toggle;
+        const target = document.querySelector('[data-edit="' + cssEscape(id) + '"]');
+        if (target) target.classList.toggle("open");
+      });
+    });
+    document.querySelectorAll("[data-save]").forEach(el => {
+      el.addEventListener("click", () => {
+        const id = el.dataset.save;
+        const root = document.querySelector('[data-card-id="' + cssEscape(id) + '"]');
+        if (!root) return;
+        const fields = {};
+        root.querySelectorAll("[data-field]").forEach(input => {
+          const f = input.dataset.field;
+          fields[f] = f === "quantity" ? (Number(input.value) || 1) : input.value;
+        });
+        updateCard(id, fields);
+      });
+    });
+    document.querySelectorAll("[data-delete]").forEach(el => {
+      el.addEventListener("click", () => removeCard(el.dataset.delete));
+    });
+  }
+
+  function on(sel, evt, fn) {
+    const el = document.querySelector(sel);
+    if (el) el.addEventListener(evt, fn);
+  }
+
+  function cssEscape(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/[^\w-]/g, "\\$&");
+  }
+
+  // ============ Inline SVG icons ============
+  function plusIcon()    { return svg('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'); }
+  function downloadIcon(){ return svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'); }
+  function uploadIcon()  { return svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'); }
+  function gridIcon()    { return svg('<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>'); }
+  function paletteIcon() { return svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>'); }
+  function searchIcon()  { return svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'); }
+  function backIcon()    { return svg('<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>'); }
+  function xIcon()       { return svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'); }
+  function trashIcon()   { return svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'); }
+  function chevronIcon() { return svg('<polyline points="6 9 12 15 18 9"/>'); }
+  function svg(inner) {
+    return '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+  }
+
+  // ============ Init ============
+  async function init() {
+    if (!supa) {
+      app.innerHTML = '<div class="empty"><div class="empty-title">Supabase konnte nicht geladen werden</div><div class="empty-body">Prüfe deine Internetverbindung und lade die Seite neu.</div></div>';
+      return;
+    }
+    await checkSession();
+    if (user) {
+      await afterLogin();
+    } else {
+      render();
+    }
+    // React to auth state changes (e.g. token refresh, logout from another tab)
+    supa.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        user = null;
+        render();
+      }
+    });
+  }
+  init();
+})();
+</script>
+</body>
+</html>
