@@ -403,6 +403,151 @@
     border-radius: var(--radius-lg);
     padding: 4px 8px;
   }
+  .tile-container {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px;
+  }
+  .tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+  .pokemon-tile {
+    background: var(--surface-2);
+    border: 0.5px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.12s, opacity 0.12s;
+  }
+  .pokemon-tile:hover { border-color: var(--border-strong); }
+  .pokemon-tile.dragging { opacity: 0.4; }
+  .pokemon-tile.drop-before {
+    box-shadow: inset 3px 0 0 0 var(--text);
+  }
+  .pokemon-tile.drop-after {
+    box-shadow: inset -3px 0 0 0 var(--text);
+  }
+  .tile-handle {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    color: var(--text-3);
+    font-size: 14px;
+    line-height: 1;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    padding: 4px 6px;
+    z-index: 2;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 3px;
+    backdrop-filter: blur(2px);
+  }
+  .tile-handle:hover { color: white; background: rgba(0, 0, 0, 0.4); }
+  .tile-handle:active { cursor: grabbing; }
+  .tile-cover {
+    aspect-ratio: 245 / 342;
+    background: var(--surface);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .tile-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile-name {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tile-meta {
+    font-size: 11px;
+    color: var(--text-2);
+    margin-top: 2px;
+  }
+  .pokemon-tile-expanded {
+    grid-column: 1 / -1;
+    background: var(--surface-2);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    transition: border-color 0.12s, opacity 0.12s;
+  }
+  .pokemon-tile-expanded.dragging { opacity: 0.4; }
+  .pokemon-tile-expanded.drop-before {
+    box-shadow: inset 3px 0 0 0 var(--text);
+  }
+  .pokemon-tile-expanded.drop-after {
+    box-shadow: inset -3px 0 0 0 var(--text);
+  }
+  .expanded-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .expanded-handle {
+    color: var(--text-3);
+    font-size: 16px;
+    line-height: 1;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    padding: 4px 2px;
+    flex: 0 0 18px;
+    text-align: center;
+  }
+  .expanded-handle:hover { color: var(--text-2); }
+  .expanded-handle:active { cursor: grabbing; }
+  .expanded-cover {
+    width: 38px;
+    aspect-ratio: 245 / 342;
+    background: var(--surface);
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+    cursor: pointer;
+    border: 0.5px solid var(--border);
+  }
+  .expanded-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .expanded-name {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+  }
+  .expanded-name-title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .expanded-name-meta {
+    font-size: 11px;
+    color: var(--text-2);
+    margin-top: 2px;
+  }
+  .expanded-toggle {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+  }
+  .expanded-toggle:hover { background: var(--surface); color: var(--text); }
+  .expanded-toggle svg { transform: rotate(180deg); }
   .accordion-row {
     border-bottom: 0.5px solid var(--border);
   }
@@ -1597,9 +1742,9 @@
     const sortBy = view.shelfSortBy || "year";
     const groups = groupedPokemonInOrder(sortBy);
     const header =
-      '<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap;">' +
+      '<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">' +
         '<div style="font-size: 12px; color: var(--text-2); flex: 1; min-width: 240px;">' +
-          'Klick aufs Pokémon zum Auf-/Zuklappen. Reihenfolge per Griff <span style="font-size: 14px;">⋮⋮</span> umsortieren.' +
+          'Klick auf eine Kachel zum Aufklappen. Reihenfolge per Griff <span style="font-size: 14px;">⋮⋮</span> umsortieren.' +
         '</div>' +
         '<div style="display: flex; align-items: center; gap: 8px;">' +
           '<button class="btn-ghost" id="expand-all" style="font-size: 12px; padding: 5px 10px;">' + (allExpanded(groups) ? "Alle einklappen" : "Alle ausklappen") + '</button>' +
@@ -1611,8 +1756,8 @@
           '</select>' +
         '</div>' +
       '</div>';
-    const rows = groups.map(g => renderAccordionRow(g)).join("");
-    return header + '<div class="shelf-container">' + rows + '</div>';
+    const tiles = groups.map(g => renderTileOrExpanded(g)).join("");
+    return header + '<div class="tile-container"><div class="tile-grid">' + tiles + '</div></div>';
   }
 
   function allExpanded(groups) {
@@ -1620,40 +1765,45 @@
     return groups.every(g => expandedPokemon.has(g.name));
   }
 
-  function renderAccordionRow(g) {
+  function renderTileOrExpanded(g) {
     const cover = pickCoverCard(g.items);
     const coverImg = (cover && cover.imageBase) ? imgUrl(cover.imageBase, "low", "webp") : "";
     const cardWord = g.items.length === 1 ? "Karte" : "Karten";
     const isOpen = expandedPokemon.has(g.name);
 
-    let content = "";
-    if (isOpen) {
-      const cardsHtml = g.items.map(c => {
-        const imgSrc = c.imageBase ? imgUrl(c.imageBase, "low", "webp") : "";
-        const setLabel = c.setName || "—";
-        const yr = yearOf(c.releaseDate);
-        return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(c.pokemonName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
-          '<div class="shelf-card-img">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(c.pokemonName) + '" loading="lazy">' : "") + '</div>' +
-          '<div class="shelf-card-set">' + escHtml(setLabel) + '</div>' +
-          (yr ? '<div class="shelf-card-year">' + escHtml(yr) + '</div>' : "") +
-        '</div>';
-      }).join("");
-      content = '<div class="accordion-content"><div class="shelf-cards">' + cardsHtml + '</div></div>';
+    if (!isOpen) {
+      return '<div class="pokemon-tile" data-pokemon="' + escHtml(g.name) + '" data-toggle-pokemon="' + escHtml(g.name) + '">' +
+        '<div class="tile-handle" data-handle="' + escHtml(g.name) + '" title="Ziehen zum Umsortieren">⋮⋮</div>' +
+        '<div class="tile-cover">' + (coverImg ? '<img src="' + escHtml(coverImg) + '" alt="' + escHtml(g.name) + '" loading="lazy">' : "") + '</div>' +
+        '<div class="tile-name">' + escHtml(g.name) + '</div>' +
+        '<div class="tile-meta">' + g.items.length + ' ' + cardWord + '</div>' +
+      '</div>';
     }
 
-    return '<div class="accordion-row" data-pokemon="' + escHtml(g.name) + '">' +
-      '<div class="accordion-header ' + (isOpen ? "open" : "") + '">' +
-        '<div class="accordion-handle" data-handle="' + escHtml(g.name) + '" title="Ziehen zum Umsortieren">⋮⋮</div>' +
-        '<div class="accordion-cover" data-open-pokemon="' + escHtml(g.name) + '" title="Detail-Ansicht">' +
+    const cardsHtml = g.items.map(c => {
+      const imgSrc = c.imageBase ? imgUrl(c.imageBase, "low", "webp") : "";
+      const setLabel = c.setName || "—";
+      const yr = yearOf(c.releaseDate);
+      return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(c.pokemonName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
+        '<div class="shelf-card-img">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(c.pokemonName) + '" loading="lazy">' : "") + '</div>' +
+        '<div class="shelf-card-set">' + escHtml(setLabel) + '</div>' +
+        (yr ? '<div class="shelf-card-year">' + escHtml(yr) + '</div>' : "") +
+      '</div>';
+    }).join("");
+
+    return '<div class="pokemon-tile-expanded" data-pokemon="' + escHtml(g.name) + '">' +
+      '<div class="expanded-header">' +
+        '<div class="expanded-handle" data-handle="' + escHtml(g.name) + '" title="Ziehen zum Umsortieren">⋮⋮</div>' +
+        '<div class="expanded-cover" data-open-pokemon="' + escHtml(g.name) + '" title="Detail-Ansicht öffnen">' +
           (coverImg ? '<img src="' + escHtml(coverImg) + '" alt="' + escHtml(g.name) + '" loading="lazy">' : "") +
         '</div>' +
-        '<div class="accordion-name" data-toggle-pokemon="' + escHtml(g.name) + '">' +
-          '<div class="accordion-name-title">' + escHtml(g.name) + '</div>' +
-          '<div class="accordion-name-meta">' + g.items.length + ' ' + cardWord + '</div>' +
+        '<div class="expanded-name" data-toggle-pokemon="' + escHtml(g.name) + '">' +
+          '<div class="expanded-name-title">' + escHtml(g.name) + '</div>' +
+          '<div class="expanded-name-meta">' + g.items.length + ' ' + cardWord + '</div>' +
         '</div>' +
-        '<button class="accordion-toggle ' + (isOpen ? "open" : "") + '" data-toggle-pokemon="' + escHtml(g.name) + '" aria-label="' + (isOpen ? "Einklappen" : "Ausklappen") + '">' + chevronIcon() + '</button>' +
+        '<button class="expanded-toggle" data-toggle-pokemon="' + escHtml(g.name) + '" aria-label="Einklappen">' + chevronIcon() + '</button>' +
       '</div>' +
-      content +
+      '<div class="shelf-cards">' + cardsHtml + '</div>' +
     '</div>';
   }
 
@@ -2253,7 +2403,7 @@
   // unified mouse + touch handling. The handle (⋮⋮) initiates the drag;
   // the whole row gets the visual drag state.
   function attachDragHandlers() {
-    const handles = document.querySelectorAll(".accordion-handle[data-handle]");
+    const handles = document.querySelectorAll("[data-handle]");
     handles.forEach(handle => {
       handle.addEventListener("pointerdown", onDragStart);
     });
@@ -2261,73 +2411,82 @@
 
   function onDragStart(e) {
     e.preventDefault();
+    e.stopPropagation();
     const handle = e.currentTarget;
-    const row = handle.closest(".accordion-row");
-    if (!row) return;
+    const tile = handle.closest(".pokemon-tile, .pokemon-tile-expanded");
+    if (!tile) return;
     const name = handle.dataset.handle;
-    const allRows = Array.from(document.querySelectorAll(".accordion-row"));
-    const fromIndex = allRows.indexOf(row);
+    const allTiles = Array.from(document.querySelectorAll(".pokemon-tile, .pokemon-tile-expanded"));
+    const fromIndex = allTiles.indexOf(tile);
     if (fromIndex === -1) return;
 
-    dragState = { name, fromIndex, currentDropIndex: fromIndex, currentEdge: "above" };
-    row.classList.add("dragging");
+    dragState = { name, fromIndex, currentDropIndex: fromIndex, currentEdge: "before" };
+    tile.classList.add("dragging");
     try { handle.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
 
-    const onMove = (ev) => onDragMove(ev, allRows);
+    const onMove = (ev) => onDragMove(ev, allTiles);
     const onUp = (ev) => {
       handle.removeEventListener("pointermove", onMove);
       handle.removeEventListener("pointerup", onUp);
       handle.removeEventListener("pointercancel", onUp);
-      onDragEnd(ev, row);
+      onDragEnd(ev, tile);
     };
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onUp);
     handle.addEventListener("pointercancel", onUp);
   }
 
-  function onDragMove(e, allRows) {
+  function onDragMove(e, allTiles) {
     if (!dragState) return;
+    const x = e.clientX;
     const y = e.clientY;
+
+    // Find the tile whose center is closest to the cursor (2D distance)
     let bestIndex = dragState.fromIndex;
-    let bestEdge = "above";
-    for (let i = 0; i < allRows.length; i++) {
+    let bestDist = Infinity;
+    let bestRect = null;
+    for (let i = 0; i < allTiles.length; i++) {
       if (i === dragState.fromIndex) continue;
-      const r = allRows[i];
-      const rect = r.getBoundingClientRect();
-      if (y >= rect.top && y <= rect.bottom) {
+      const rect = allTiles[i].getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dist = Math.hypot(x - cx, y - cy);
+      if (dist < bestDist) {
+        bestDist = dist;
         bestIndex = i;
-        bestEdge = (y < rect.top + rect.height / 2) ? "above" : "below";
-        break;
-      }
-      if (y < rect.top && i === 0) {
-        bestIndex = 0;
-        bestEdge = "above";
-        break;
-      }
-      if (i === allRows.length - 1 && y > rect.bottom) {
-        bestIndex = i;
-        bestEdge = "below";
+        bestRect = rect;
       }
     }
-    // Clear previous indicators
-    allRows.forEach(r => r.classList.remove("drop-above", "drop-below"));
+
+    // Determine drop edge: before (left) or after (right) the closest tile.
+    // For expanded tiles (full width), use top/bottom instead.
+    let bestEdge = "before";
+    if (bestRect) {
+      const target = allTiles[bestIndex];
+      const isFullWidth = target.classList.contains("pokemon-tile-expanded");
+      if (isFullWidth) {
+        bestEdge = (y < bestRect.top + bestRect.height / 2) ? "before" : "after";
+      } else {
+        bestEdge = (x < bestRect.left + bestRect.width / 2) ? "before" : "after";
+      }
+    }
+
+    allTiles.forEach(t => t.classList.remove("drop-before", "drop-after"));
     if (bestIndex !== dragState.fromIndex) {
-      allRows[bestIndex].classList.add(bestEdge === "above" ? "drop-above" : "drop-below");
+      allTiles[bestIndex].classList.add(bestEdge === "before" ? "drop-before" : "drop-after");
     }
     dragState.currentDropIndex = bestIndex;
     dragState.currentEdge = bestEdge;
   }
 
-  function onDragEnd(e, row) {
+  function onDragEnd(e, tile) {
     if (!dragState) return;
-    const allRows = Array.from(document.querySelectorAll(".accordion-row"));
-    allRows.forEach(r => r.classList.remove("drop-above", "drop-below", "dragging"));
+    const allTiles = Array.from(document.querySelectorAll(".pokemon-tile, .pokemon-tile-expanded"));
+    allTiles.forEach(t => t.classList.remove("drop-before", "drop-after", "dragging"));
 
     if (dragState.currentDropIndex !== dragState.fromIndex) {
-      // Translate visual drop position into target index in the order array
       let target = dragState.currentDropIndex;
-      if (dragState.currentEdge === "below") target += 1;
-      // Account for the fact that removing the dragged item shifts indices
+      if (dragState.currentEdge === "after") target += 1;
       if (target > dragState.fromIndex) target -= 1;
       reorderPokemon(dragState.name, target);
     }
