@@ -574,6 +574,80 @@
     cursor: pointer;
   }
   .user-chip:hover { border-color: var(--border-strong); }
+  .avatar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 0.5px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-2);
+    cursor: pointer;
+    overflow: hidden;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .avatar-btn:hover { border-color: var(--border-strong); }
+  .avatar-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .avatar-large {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 0.5px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-2);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .avatar-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .profile-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .profile-avatar-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .profile-avatar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+    border: 0.5px solid var(--danger-fg);
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-danger:hover { opacity: 0.85; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -641,6 +715,7 @@
   let syncTimer = null;    // debounce timer for outgoing sync
   let lastSyncedJson = ""; // memo to avoid syncing identical state
   let initialLoadDone = false;
+  let profileModalOpen = false; // when true, render the profile modal overlay
 
   // ============ Persistence ============
   // Strategy: localStorage acts as a fast local cache + offline buffer.
@@ -656,8 +731,7 @@
       if (raw) {
         const parsed = JSON.parse(raw);
         collection = parsed;
-        if (!collection.cards) collection.cards = {};
-        if (!Array.isArray(collection.pokemonOrder)) collection.pokemonOrder = [];
+        ensureCollectionShape();
         return;
       }
       // No data under user-scoped key yet. Try to migrate legacy v2 data on first login.
@@ -669,8 +743,7 @@
             const old = JSON.parse(legacy);
             if (old && old.cards) {
               collection = old;
-              if (!collection.cards) collection.cards = {};
-              if (!Array.isArray(collection.pokemonOrder)) collection.pokemonOrder = [];
+              ensureCollectionShape();
             }
           } catch (e) { /* ignore */ }
         }
@@ -687,10 +760,20 @@
           } catch (e) { /* ignore */ }
         }
       }
+      ensureCollectionShape();
     } catch (e) {
       console.error("Local load failed", e);
       collection = { cards: {}, pokemonOrder: [] };
+      ensureCollectionShape();
     }
+  }
+
+  function ensureCollectionShape() {
+    if (!collection.cards) collection.cards = {};
+    if (!Array.isArray(collection.pokemonOrder)) collection.pokemonOrder = [];
+    if (!collection.profile) collection.profile = { name: "", avatar: "" };
+    if (typeof collection.profile.name !== "string") collection.profile.name = "";
+    if (typeof collection.profile.avatar !== "string") collection.profile.avatar = "";
   }
 
   function userKey() {
@@ -726,9 +809,8 @@
       if (data && data.data) {
         // Sanity check + merge defaults
         const remote = data.data;
-        if (!remote.cards) remote.cards = {};
-        if (!Array.isArray(remote.pokemonOrder)) remote.pokemonOrder = [];
         collection = remote;
+        ensureCollectionShape();
         saveCollectionLocal();
         lastSyncedJson = JSON.stringify(collection);
       } else {
@@ -1119,10 +1201,14 @@
     else if (view.name === "artist") body = renderArtistDetail(cards.filter(c => c.artist === view.artist));
     else if (view.name === "search") body = renderSearch(cards);
 
+    const collectionTitle = (collection.profile && collection.profile.name) ? collection.profile.name : "Meine Sammlung";
+    const avatarSrc = (collection.profile && collection.profile.avatar) ? collection.profile.avatar : "";
+    const avatarInitial = avatarInitialFor(user.email, collection.profile ? collection.profile.name : "");
+
     app.innerHTML =
       '<div class="header">' +
         '<div>' +
-          '<h1>Meine Sammlung <span class="sync-indicator ' + syncStatus + '" id="sync-indicator"><span class="dot"></span><span>' + syncLabel() + '</span></span></h1>' +
+          '<h1>' + escHtml(collectionTitle) + ' <span class="sync-indicator ' + syncStatus + '" id="sync-indicator"><span class="dot"></span><span>' + syncLabel() + '</span></span></h1>' +
           '<div class="header-meta">' + totalCount + ' Karten · ' + uniquePokemon + ' verschiedene Pokémon</div>' +
         '</div>' +
         '<div class="header-actions">' +
@@ -1130,7 +1216,9 @@
           '<button class="btn-icon" id="btn-export" title="Als JSON exportieren">' + downloadIcon() + '</button>' +
           '<button class="btn-icon" id="btn-import" title="JSON importieren">' + uploadIcon() + '</button>' +
           '<input type="file" id="import-file" accept="application/json" class="hidden">' +
-          '<button class="user-chip" id="btn-user" title="Klicken zum Ausloggen">' + escHtml(user.email) + '</button>' +
+          '<button class="avatar-btn" id="btn-profile" title="Profil und Einstellungen">' +
+            (avatarSrc ? '<img src="' + escHtml(avatarSrc) + '" alt="">' : escHtml(avatarInitial)) +
+          '</button>' +
         '</div>' +
       '</div>' +
       '<div class="tabs">' +
@@ -1139,7 +1227,8 @@
         '<button class="tab ' + (view.name === "search" ? "active" : "") + '" data-tab="search">' + searchIcon() + ' Suche</button>' +
       '</div>' +
       body +
-      (modalState ? renderModal() : "");
+      (modalState ? renderModal() : "") +
+      (profileModalOpen ? renderProfileModal() : "");
 
     attachHandlers();
   }
@@ -1164,6 +1253,136 @@
     });
     const form = document.getElementById("auth-form");
     if (form) form.addEventListener("submit", handleAuthSubmit);
+  }
+
+  // ============ Profile modal ============
+  function avatarInitialFor(email, name) {
+    if (name && name.trim()) return name.trim().charAt(0).toUpperCase();
+    if (email) return email.charAt(0).toUpperCase();
+    return "?";
+  }
+
+  function renderProfileModal() {
+    const profile = collection.profile || { name: "", avatar: "" };
+    const avatarSrc = profile.avatar || "";
+    const initial = avatarInitialFor(user.email, profile.name);
+    return '<div class="modal-overlay" id="profile-overlay">' +
+      '<div class="modal" id="profile-modal" style="max-width: 460px;">' +
+        '<div class="modal-header">' +
+          '<h3>Profil</h3>' +
+          '<button class="btn-icon" id="profile-close">' + xIcon() + '</button>' +
+        '</div>' +
+        '<div class="profile-section">' +
+          '<div class="profile-avatar-row">' +
+            '<div class="avatar-large" id="profile-avatar-preview">' +
+              (avatarSrc ? '<img src="' + escHtml(avatarSrc) + '" alt="">' : escHtml(initial)) +
+            '</div>' +
+            '<div class="profile-avatar-actions">' +
+              '<button class="btn-ghost" id="profile-avatar-pick">Bild auswählen</button>' +
+              (avatarSrc ? '<button class="btn-ghost" id="profile-avatar-remove" style="color: var(--danger-fg);">Bild entfernen</button>' : "") +
+              '<input type="file" id="profile-avatar-file" accept="image/*" class="hidden">' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<label class="field-label">Name der Sammlung</label>' +
+            '<input type="text" id="profile-name" value="' + escHtml(profile.name) + '" placeholder="z.B. „Sarahs Pokémon-Sammlung"" maxlength="80">' +
+            '<div style="font-size: 11px; color: var(--text-2); margin-top: 4px;">Wird statt „Meine Sammlung" oben angezeigt.</div>' +
+          '</div>' +
+          '<div style="font-size: 12px; color: var(--text-2); padding-top: 8px; border-top: 0.5px solid var(--border);">' +
+            'Angemeldet als <b>' + escHtml(user.email) + '</b>' +
+          '</div>' +
+          '<div style="display: flex; gap: 8px; margin-top: 4px;">' +
+            '<button class="btn-primary" id="profile-save" style="flex: 1; justify-content: center;">Speichern</button>' +
+            '<button class="btn-danger" id="profile-logout">Abmelden</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function attachProfileHandlers() {
+    const overlay = document.getElementById("profile-overlay");
+    if (overlay) {
+      overlay.addEventListener("click", e => {
+        if (e.target === overlay) closeProfileModal();
+      });
+    }
+    on("#profile-close", "click", closeProfileModal);
+    on("#profile-avatar-pick", "click", () => document.getElementById("profile-avatar-file").click());
+    on("#profile-avatar-file", "change", e => {
+      const f = e.target.files[0];
+      if (f) handleAvatarFile(f);
+    });
+    on("#profile-avatar-remove", "click", () => {
+      ensureCollectionShape();
+      collection.profile.avatar = "";
+      saveCollection();
+      render();
+      // Re-open the modal afterwards so user stays in flow
+      profileModalOpen = true;
+      render();
+    });
+    on("#profile-save", "click", () => {
+      const nameInput = document.getElementById("profile-name");
+      ensureCollectionShape();
+      collection.profile.name = nameInput ? nameInput.value.trim().slice(0, 80) : "";
+      saveCollection();
+      closeProfileModal();
+    });
+    on("#profile-logout", "click", () => {
+      if (confirm("Wirklich abmelden? Deine Sammlung bleibt online gespeichert und ist nach erneutem Login wieder verfügbar.")) {
+        closeProfileModal();
+        signOut();
+      }
+    });
+  }
+
+  function closeProfileModal() {
+    profileModalOpen = false;
+    render();
+  }
+
+  // Read selected image file, downscale to ~256px max, store as base64 data URL.
+  // Keeps the JSON small and avoids needing Supabase Storage.
+  function handleAvatarFile(file) {
+    if (!file.type.startsWith("image/")) {
+      alert("Bitte wähle eine Bilddatei aus.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 256;
+        let w = img.width;
+        let h = img.height;
+        if (w > h) {
+          if (w > max) { h = Math.round(h * max / w); w = max; }
+        } else {
+          if (h > max) { w = Math.round(w * max / h); h = max; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        if (dataUrl.length > 200000) {
+          alert("Das Bild ist auch nach Komprimierung noch sehr groß (" + Math.round(dataUrl.length / 1024) + " KB). Bitte wähle ein kleineres Bild.");
+          return;
+        }
+        ensureCollectionShape();
+        collection.profile.avatar = dataUrl;
+        saveCollection();
+        // Re-open modal so user sees the new avatar
+        profileModalOpen = true;
+        render();
+      };
+      img.onerror = () => alert("Bild konnte nicht geladen werden.");
+      img.src = e.target.result;
+    };
+    reader.onerror = () => alert("Datei konnte nicht gelesen werden.");
+    reader.readAsDataURL(file);
   }
 
   function renderPokedex(cards) {
@@ -1590,11 +1809,12 @@
       const f = e.target.files[0];
       if (f) importJson(f);
     });
-    on("#btn-user", "click", () => {
-      if (confirm("Wirklich ausloggen? Deine Sammlung bleibt online gespeichert und ist nach erneutem Login wieder verfügbar.")) {
-        signOut();
-      }
+    on("#btn-profile", "click", () => {
+      profileModalOpen = true;
+      render();
     });
+
+    if (profileModalOpen) attachProfileHandlers();
 
     document.querySelectorAll(".tab").forEach(el => {
       el.addEventListener("click", () => {
