@@ -1001,6 +1001,8 @@
     await loadFromRemote();
     initialLoadDone = true;
     render();
+    // Backfill missing release dates in the background (won't block UI)
+    backfillReleaseDates();
   }
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
@@ -1109,6 +1111,62 @@
     if (!dateStr) return "";
     const m = String(dateStr).match(/^(\d{4})/);
     return m ? m[1] : "";
+  }
+
+  // ============ Set info cache ============
+  // TCGdex's card endpoint returns a partial `set` object without `releaseDate`.
+  // To show the year on cards, we need to fetch the full set separately.
+  // We cache fetched set data per language+setId for the duration of the session
+  // so we don't hit the API repeatedly for the same set.
+  const setInfoCache = {};
+
+  async function fetchSetInfo(lang, setId) {
+    if (!lang || !setId) return null;
+    const key = lang + ":" + setId;
+    if (setInfoCache[key]) return setInfoCache[key];
+    try {
+      const res = await fetch(API_BASE + "/" + encodeURIComponent(lang) + "/sets/" + encodeURIComponent(setId));
+      if (!res.ok) return null;
+      const data = await res.json();
+      const info = {
+        releaseDate: data.releaseDate || "",
+        name: data.name || ""
+      };
+      setInfoCache[key] = info;
+      return info;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // One-shot backfill: walk through the collection and fill in missing
+  // releaseDate values using the set cache. Runs once per session after login.
+  async function backfillReleaseDates() {
+    const cards = Object.values(collection.cards);
+    const missing = cards.filter(c => !c.releaseDate && c.setId && c.language);
+    if (missing.length === 0) return;
+    let changed = false;
+    // Group by lang+setId to minimize API calls
+    const groups = {};
+    for (const c of missing) {
+      const k = c.language + ":" + c.setId;
+      if (!groups[k]) groups[k] = { lang: c.language, setId: c.setId, cards: [] };
+      groups[k].cards.push(c);
+    }
+    for (const k in groups) {
+      const g = groups[k];
+      const info = await fetchSetInfo(g.lang, g.setId);
+      if (info && info.releaseDate) {
+        for (const c of g.cards) {
+          c.releaseDate = info.releaseDate;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      saveCollection();
+      render();
+    }
   }
 
   // Build TCGdex image URL: stored card.imageBase + "/" + quality + "." + format
@@ -1463,20 +1521,68 @@
         '<div class="empty-body">Sobald du Karten hinzufügst, erscheinen die Illustrator:innen hier.</div>' +
       '</div>';
     }
+    const sortBy = view.shelfSortBy || "year";
+    const groups = groupedArtistsForShelf(sortBy);
+    const header =
+      '<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap;">' +
+        '<div style="font-size: 12px; color: var(--text-2); flex: 1; min-width: 240px;">Künstler:innen alphabetisch sortiert. Klick auf eine Reihe für die Detail-Ansicht.</div>' +
+        '<div style="display: flex; align-items: center; gap: 8px;">' +
+          '<label style="font-size: 12px; color: var(--text-2);">Karten sortieren:</label>' +
+          '<select id="shelf-sort" style="width: auto; min-width: 180px;">' +
+            '<option value="year"' + (sortBy === "year" ? " selected" : "") + '>Nach Jahr</option>' +
+            '<option value="set"' + (sortBy === "set" ? " selected" : "") + '>Nach Set (alphabetisch)</option>' +
+            '<option value="setChronological"' + (sortBy === "setChronological" ? " selected" : "") + '>Nach Set (chronologisch)</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>';
+    const rows = groups.map(g => {
+      const cardsHtml = g.items.map(c => {
+        const imgSrc = c.imageBase ? imgUrl(c.imageBase, "low", "webp") : "";
+        const setLabel = c.setName || "—";
+        const yr = yearOf(c.releaseDate);
+        return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(c.pokemonName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
+          '<div class="shelf-card-img">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(c.pokemonName) + '" loading="lazy">' : "") + '</div>' +
+          '<div class="shelf-card-set">' + escHtml(setLabel) + '</div>' +
+          (yr ? '<div class="shelf-card-year">' + escHtml(yr) + '</div>' : "") +
+        '</div>';
+      }).join("");
+      const cardWord = g.items.length === 1 ? "Karte" : "Karten";
+      const pokemonWord = g.pokemonCount === 1 ? "Pokémon" : "Pokémon";
+      return '<div class="shelf-row" data-artist="' + escHtml(g.name) + '">' +
+        '<div class="shelf-name" data-open-artist="' + escHtml(g.name) + '" style="flex: 0 0 140px;">' +
+          '<div class="shelf-name-title">' + escHtml(g.name) + '</div>' +
+          '<div class="shelf-name-meta">' + g.items.length + ' ' + cardWord + ' · ' + g.pokemonCount + ' ' + pokemonWord + '</div>' +
+        '</div>' +
+        '<div class="shelf-cards">' + cardsHtml + '</div>' +
+      '</div>';
+    }).join("");
+    return header + '<div class="shelf-container">' + rows + '</div>';
+  }
+
+  // Group cards by artist, sort cards within each group, and order
+  // the artists alphabetically (with "Unbekannt" at the end).
+  function groupedArtistsForShelf(sortBy) {
+    sortBy = sortBy || "year";
+    const cards = cardsArr();
     const map = {};
     for (const c of cards) {
       const a = c.artist || "Unbekannt";
-      if (!map[a]) map[a] = { name: a, items: [], pokemon: new Set() };
+      if (!map[a]) map[a] = { name: a, items: [], pokemonSet: new Set() };
       map[a].items.push(c);
-      map[a].pokemon.add(c.pokemonName);
+      map[a].pokemonSet.add(c.pokemonName);
     }
-    const grouped = Object.values(map).sort((a, b) => b.items.length - a.items.length);
-    return '<div class="grid-artists">' + grouped.map(g =>
-      '<button class="artist-tile" data-artist="' + escHtml(g.name) + '">' +
-        '<div class="tile-title">' + escHtml(g.name) + '</div>' +
-        '<div class="tile-meta">' + g.items.length + ' Karten · ' + g.pokemon.size + ' Pokémon</div>' +
-      '</button>'
-    ).join("") + '</div>';
+    const cmp = shelfCardComparator(sortBy);
+    const arr = Object.values(map).map(g => ({
+      name: g.name,
+      items: g.items.sort(cmp),
+      pokemonCount: g.pokemonSet.size
+    }));
+    arr.sort((a, b) => {
+      if (a.name === "Unbekannt") return 1;
+      if (b.name === "Unbekannt") return -1;
+      return a.name.localeCompare(b.name);
+    });
+    return arr;
   }
 
   function renderArtistDetail(cards) {
@@ -1728,7 +1834,9 @@
   async function selectResult(id) {
     const stub = modalState.results.find(x => x.id === id);
     if (!stub) return;
-    // Fetch full card details (illustrator, set, rarity, etc.)
+    // Fetch full card details (illustrator, set, rarity, etc.) plus set info (releaseDate).
+    // The card endpoint's `set` object doesn't include releaseDate — we fetch it separately
+    // and cache it for the session.
     modalState.loadingDetail = true;
     render();
     try {
@@ -1736,15 +1844,21 @@
       const res = await fetch(url);
       if (!res.ok) throw new Error("API-Fehler " + res.status);
       const card = await res.json();
+      const setId = card.set ? card.set.id : "";
+      let releaseDate = "";
+      if (setId) {
+        const setInfo = await fetchSetInfo(modalState.lang, setId);
+        if (setInfo) releaseDate = setInfo.releaseDate || "";
+      }
       modalState.selected = {
         cardId: card.id,
         name: card.name,
         setName: card.set ? card.set.name : "",
-        setId: card.set ? card.set.id : "",
+        setId: setId,
         cardNumber: card.localId || "",
         artist: card.illustrator || "",
         rarity: card.rarity || "",
-        releaseDate: card.set && card.set.releaseDate ? card.set.releaseDate : "",
+        releaseDate: releaseDate,
         imageBase: card.image || stub.image || "",
         availableVariants: card.variants || null,
       };
@@ -1838,23 +1952,32 @@
       render();
     });
 
-    // Shelf: open detail by clicking a card thumbnail (jumps to that pokémon's view)
+    // Shelf: open detail by clicking a card thumbnail.
+    // In Pokémon-Regal: jumps to the pokémon's detail view.
+    // In Künstler-Regal: jumps to the pokémon detail of *that specific card*
+    // (the row itself is keyed by artist, but each card has data-card-pokemon).
     document.querySelectorAll(".shelf-card").forEach(el => {
       el.addEventListener("click", () => {
         const row = el.closest(".shelf-row");
-        if (row) {
+        if (!row) return;
+        if (el.dataset.cardPokemon) {
+          // Künstler-Reihe — Pokémon-Name steckt am Card-Element selbst
+          view = { name: "pokemon", pokemonName: el.dataset.cardPokemon };
+        } else if (row.dataset.pokemon) {
+          // Pokémon-Reihe — Pokémon-Name steckt an der Reihe
           view = { name: "pokemon", pokemonName: row.dataset.pokemon };
-          render();
         }
+        render();
       });
     });
 
-    // Shelf: drag handles for reordering
+    // Shelf: drag handles for reordering (only on the Pokémon-Regal)
     attachDragHandlers();
 
-    document.querySelectorAll(".artist-tile").forEach(el => {
+    // Künstler-Regal: Klick auf Künstler-Namen öffnet Detail-Ansicht
+    document.querySelectorAll("[data-open-artist]").forEach(el => {
       el.addEventListener("click", () => {
-        view = { name: "artist", artist: el.dataset.artist };
+        view = { name: "artist", artist: el.dataset.openArtist };
         render();
       });
     });
