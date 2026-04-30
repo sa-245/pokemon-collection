@@ -1061,6 +1061,40 @@
     if (!collection.profile) collection.profile = { name: "", avatar: "" };
     if (typeof collection.profile.name !== "string") collection.profile.name = "";
     if (typeof collection.profile.avatar !== "string") collection.profile.avatar = "";
+    // Backfill normalized pokemon group name for cards added before this feature
+    let migratedCard = false;
+    for (const id in collection.cards) {
+      const c = collection.cards[id];
+      if (!c.pokemonGroupName && c.pokemonName) {
+        c.pokemonGroupName = normalizePokemonName(c.pokemonName);
+        migratedCard = true;
+      }
+    }
+    // Migrate pokemonOrder: entries that are old (raw) names get normalized.
+    // We collapse duplicates (e.g. "Pikachu" + "Pikachu ex" both already in
+    // the order list end up as one "Pikachu" entry).
+    let migratedOrder = false;
+    if (collection.pokemonOrder.length > 0) {
+      const newOrder = [];
+      const seen = new Set();
+      for (const name of collection.pokemonOrder) {
+        const normalized = normalizePokemonName(name);
+        if (!seen.has(normalized)) {
+          newOrder.push(normalized);
+          seen.add(normalized);
+        }
+        if (normalized !== name) migratedOrder = true;
+      }
+      if (migratedOrder || newOrder.length !== collection.pokemonOrder.length) {
+        collection.pokemonOrder = newOrder;
+        migratedOrder = true;
+      }
+    }
+    if (migratedCard || migratedOrder) {
+      // Only triggers a sync if anything actually changed
+      saveCollectionLocal();
+      if (user && supa) scheduleSync();
+    }
   }
 
   function userKey() {
@@ -1314,6 +1348,50 @@
     return Object.entries(collection.cards).map(([id, c]) => Object.assign({ id }, c));
   }
 
+  // Normalize a card's Pokémon name to a "species name" for grouping.
+  // Strips card mechanic suffixes like "ex", "V", "VMAX", "GX", "BREAK" etc.
+  // Keeps species prefixes like "Dunkles", "Light", "Shining" (those are
+  // distinct entries in the Pokédex and shouldn't be merged).
+  // Examples:
+  //   "Pikachu"         -> "Pikachu"
+  //   "Pikachu ex"      -> "Pikachu"
+  //   "Pikachu-EX"      -> "Pikachu"
+  //   "Pikachu V"       -> "Pikachu"
+  //   "Pikachu VMAX"    -> "Pikachu"
+  //   "Glurak GX"       -> "Glurak"
+  //   "Dunkles Glurak"  -> "Dunkles Glurak"  (kept)
+  //   "Light Pikachu"   -> "Light Pikachu"   (kept)
+  function normalizePokemonName(name) {
+    if (!name) return "";
+    let s = String(name).trim();
+    // Suffixes that mark a card mechanic, not a different species.
+    // Order matters: longer/more-specific patterns first.
+    const suffixPatterns = [
+      /\s+VSTAR$/i,
+      /\s+VMAX$/i,
+      /\s+V-UNION$/i,
+      /\s+V$/i,
+      /[\s-]GX$/i,
+      /[\s-]EX$/i,        // catches both "Pikachu EX" (BW era) and "Pikachu-EX" (XY era)
+      /\s+ex$/,           // lowercase "ex" (current era, e.g. "Pikachu ex")
+      /\s+BREAK$/i,
+      /\s+LV\.?\s*X$/i,
+      /\s+\u2605$/,       // shining ★ suffix
+      /\s+δ$/,            // delta species δ
+      /\s+&\s+.+\s+GX$/i, // tag team: "Pikachu & Zekrom GX"
+      /\s+&\s+.+\s+ex$/i,
+    ];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const p of suffixPatterns) {
+        const next = s.replace(p, "");
+        if (next !== s) { s = next; changed = true; break; }
+      }
+    }
+    return s.trim();
+  }
+
   // Find the cover card for a pokémon group:
   // - If the user explicitly marked one with isCover: true, use that
   // - Otherwise, fall back to the card with the highest rarity
@@ -1329,14 +1407,16 @@
   }
 
   // Mark a card as the cover for its pokémon. Clears the flag from other
-  // cards of the same pokémon. Pass `null` to clear all (revert to default).
+  // cards of the same pokémon group. Pass `null` to clear all (revert to default).
   function setCoverCard(cardId) {
     const target = collection.cards[cardId];
     if (!target) return;
-    const pokemonName = target.pokemonName;
+    const groupName = target.pokemonGroupName || normalizePokemonName(target.pokemonName);
     for (const id in collection.cards) {
-      if (collection.cards[id].pokemonName === pokemonName) {
-        delete collection.cards[id].isCover;
+      const c = collection.cards[id];
+      const cGroup = c.pokemonGroupName || normalizePokemonName(c.pokemonName);
+      if (cGroup === groupName) {
+        delete c.isCover;
       }
     }
     collection.cards[cardId].isCover = true;
@@ -1345,8 +1425,10 @@
 
   function clearCoverCard(pokemonName) {
     for (const id in collection.cards) {
-      if (collection.cards[id].pokemonName === pokemonName) {
-        delete collection.cards[id].isCover;
+      const c = collection.cards[id];
+      const cGroup = c.pokemonGroupName || normalizePokemonName(c.pokemonName);
+      if (cGroup === pokemonName) {
+        delete c.isCover;
       }
     }
     saveCollection();
@@ -1360,9 +1442,12 @@
     const cards = cardsArr();
     const map = {};
     for (const c of cards) {
-      if (!map[c.pokemonName]) map[c.pokemonName] = { name: c.pokemonName, items: [], total: 0 };
-      map[c.pokemonName].items.push(c);
-      map[c.pokemonName].total += Number(c.quantity) || 1;
+      // Use normalized group name (e.g. "Pikachu" for "Pikachu", "Pikachu ex", "Pikachu V").
+      // Falls back to the raw name for legacy cards that haven't been backfilled yet.
+      const groupKey = c.pokemonGroupName || normalizePokemonName(c.pokemonName);
+      if (!map[groupKey]) map[groupKey] = { name: groupKey, items: [], total: 0 };
+      map[groupKey].items.push(c);
+      map[groupKey].total += Number(c.quantity) || 1;
     }
     // Sort cards within each group
     const cmp = shelfCardComparator(sortBy);
@@ -1717,7 +1802,7 @@
 
     let body = "";
     if (view.name === "pokedex") body = renderPokedex(cards);
-    else if (view.name === "pokemon") body = renderPokemonDetail(cards.filter(c => c.pokemonName === view.pokemonName));
+    else if (view.name === "pokemon") body = renderPokemonDetail(cards.filter(c => (c.pokemonGroupName || normalizePokemonName(c.pokemonName)) === view.pokemonName));
     else if (view.name === "artists") body = renderArtists(cards);
     else if (view.name === "artist") body = renderArtistDetail(cards.filter(c => c.artist === view.artist));
     else if (view.name === "search") body = renderSearch(cards);
@@ -1981,7 +2066,8 @@
       const setLabel = c.setName || "—";
       const yr = yearOf(c.releaseDate);
       const priceLabel = (typeof c.price === "number") ? formatPrice(c.price) : "";
-      return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(c.pokemonName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "") + (priceLabel ? " · " + priceLabel : "")) + '">' +
+      const groupName = c.pokemonGroupName || normalizePokemonName(c.pokemonName);
+      return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(groupName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "") + (priceLabel ? " · " + priceLabel : "")) + '">' +
         '<div class="shelf-card-img">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(c.pokemonName) + '" loading="lazy">' : "") + '</div>' +
         '<div class="shelf-card-set">' + escHtml(setLabel) + '</div>' +
         (yr ? '<div class="shelf-card-year">' + escHtml(yr) + '</div>' : "") +
@@ -2057,7 +2143,8 @@
         const imgSrc = c.imageBase ? imgUrl(c.imageBase, "low", "webp") : "";
         const setLabel = c.setName || "—";
         const yr = yearOf(c.releaseDate);
-        return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(c.pokemonName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
+        const groupName = c.pokemonGroupName || normalizePokemonName(c.pokemonName);
+        return '<div class="shelf-card" data-card-id="' + escHtml(c.id) + '" data-card-pokemon="' + escHtml(groupName) + '" title="' + escHtml(c.pokemonName + " · " + setLabel + (yr ? " · " + yr : "")) + '">' +
           '<div class="shelf-card-img">' + (imgSrc ? '<img src="' + escHtml(imgSrc) + '" alt="' + escHtml(c.pokemonName) + '" loading="lazy">' : "") + '</div>' +
           '<div class="shelf-card-set">' + escHtml(setLabel) + '</div>' +
           (yr ? '<div class="shelf-card-year">' + escHtml(yr) + '</div>' : "") +
@@ -2421,6 +2508,7 @@
     const entry = {
       cardId: sel.cardId,
       pokemonName: sel.name,
+      pokemonGroupName: normalizePokemonName(sel.name),
       setName: sel.setName,
       setId: sel.setId,
       cardNumber: sel.cardNumber,
